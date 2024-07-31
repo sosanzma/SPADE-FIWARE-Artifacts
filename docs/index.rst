@@ -3,7 +3,7 @@ SPADE-FIWARE-Artifacts
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :titlesonly:
 
    readme
    installation
