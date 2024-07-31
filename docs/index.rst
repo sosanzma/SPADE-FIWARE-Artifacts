@@ -1,4 +1,4 @@
-PyJabber
+SPADE-FIWARE-Artifacts
 ======================================
 
 .. toctree::
