@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 #
-# pyjabber documentation build configuration file, created by
-# sphinx-quickstart on Fri Jun  9 13:47:02 2017.
+# SPADE-FIWARE-Artifacts documentation build configuration file, created by
+# sphinx-quickstart on Wed Jul 31 13:32:45 2024.
+
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.

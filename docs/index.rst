@@ -9,7 +9,6 @@ SPADE-FIWARE-Artifacts
    installation
    architecture
    spade
-   modules
    contributing
    authors
    history
@@ -17,5 +16,4 @@ SPADE-FIWARE-Artifacts
 Indices and tables
 ==================
 * :ref:`genindex`
-* :ref:`modindex`
 * :ref:`search`
