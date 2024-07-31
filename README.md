@@ -14,7 +14,7 @@ SPADE-FIWARE-Artifacts is a toolkit that bridges the gap between SPADE (Smart Py
 ## Installation
 
 ```bash
-pip install spade-fiware-artifacts
+pip install spade_fiware_artifacts
 ```
 
 ## Quick Start
