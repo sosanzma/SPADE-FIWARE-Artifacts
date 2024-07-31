@@ -1,9 +1,13 @@
-SPADE-FIWARE-Artifacts
-======================
-
 .. image:: https://readthedocs.org/projects/spade-fiware-artifacts/badge/?version=latest
     :target: https://spade-fiware-artifacts.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+SPADE-FIWARE-Artifacts
+======================
+
+.. warning::
+
+    **This repository is currently under development and not yet available for general use.**
 
 SPADE-FIWARE-Artifacts is a toolkit that bridges the gap between SPADE (Smart Python Agent Development Environment) and FIWARE, specifically the Orion and Scorpio Context Brokers. This project provides a set of artifacts that enable SPADE-based multi-agent systems to seamlessly interact with FIWARE's context management capabilities.
 
@@ -112,4 +116,4 @@ These artifacts are compatible with both Orion and Scorpio Context Brokers, allo
 Documentation
 -------------
 
-For detailed documentation, please visit our `Wiki <https://github.com/sosanzma/SPADE-FIWARE-Artifacts/wiki>`_.
+For detailed documentation, please visit our `ReadTheDocs documentation <https://spade-fiware-artifacts.readthedocs.io/en/latest/>`_.
