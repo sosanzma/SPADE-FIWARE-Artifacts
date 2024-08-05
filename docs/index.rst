@@ -7,7 +7,7 @@ SPADE-FIWARE-Artifacts
 
    readme
    installation
-   architecture
+   example
    spade
    contributing
    authors
