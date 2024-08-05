@@ -9,11 +9,7 @@ SPADE-FIWARE-Artifacts
    installation
    example
    spade
+   future_work
    contributing
    authors
    history
-
-Indices and tables
-==================
-* :ref:`genindex`
-* :ref:`search`

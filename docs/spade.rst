@@ -1,12 +1,4 @@
-Detailed Usage Guide for SPADE-FIWARE-Artifacts
-===============================================
-
-Introduction
-------------
-
-This guide provides a comprehensive explanation on how to use the SPADE-FIWARE artifacts and connect to a FIWARE Context Broker. We'll focus on the example file ``inserter_context_broker.py`` and the associated JSON files to illustrate the process.
-
-Understanding SPADE and Multi-Agent Systems
+Why  SPADE + FIWARE ?
 -------------------------------------------
 
 What is SPADE?

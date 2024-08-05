@@ -1,4 +1,4 @@
-Detailed Usage Guide for SPADE-FIWARE-Artifacts
+Use Case Guide for SPADE-FIWARE-Artifacts
 ===============================================
 
 Introduction
