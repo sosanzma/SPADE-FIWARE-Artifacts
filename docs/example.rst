@@ -199,7 +199,6 @@ payload.json
     }
 
 This file contains example data that will be inserted into the Context Broker. In a real-world scenario, this data would come from your actual data source.
-
 How to Use
 ----------
 
@@ -214,6 +213,22 @@ How to Use
 
 4. **Monitor**: The script will start publishing data and inserting it into the Context Broker. Monitor the console output for any errors or successful insertions.
 
+.. warning::
+   The example is configured to use port 9090 by default, as the ``InserterArtifact`` class is parameterized for this port. If you want to use the Orion Context Broker, which typically runs on port 1026, you should modify the port in your configuration or when initializing the ``InserterArtifact``.
+
+   It's important to note that the default port 9090 is typically used for testing or development environments. For production use with the Orion Context Broker, you must change this to port 1026.
+
+   To change the port:
+
+
+   Update the ``InserterArtifact`` initialization in ``inserter_context_broker.py``:
+
+      .. code-block:: python
+
+         subscriber = InserterArtifact(subscriber_jid, subscriber_passwd, publisher_jid, f"{host}:1026",
+                                       project_name, json_template=json_template)
+
+   Make sure to use the correct port (1026 for Orion Context Broker) to ensure proper communication with your FIWARE environment.
 Customization
 -------------
 
