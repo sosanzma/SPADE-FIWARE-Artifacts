@@ -49,7 +49,7 @@ async def main():
 
 
     subscriber = InserterArtifact(subscriber_jid, subscriber_passwd, publisher_jid, host,
-                                  project_name, json_template=json_template,columns_update=['location'])
+                                  project_name, json_template=json_template)
 
     await publisher.start()
     await subscriber.start()

@@ -33,18 +33,13 @@ Table of Contents
    :maxdepth: 2
    :caption: User Guide
 
-   concepts
-   configuration
-   usage_examples
-   api_reference
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Advanced Topics
 
-   advanced_usage
-   performance_tuning
-   security_considerations
+   example
+   spade
+   future_work
+
+
 
 .. toctree::
    :maxdepth: 1
@@ -65,8 +60,8 @@ Table of Contents
 Quick Links
 -----------
 
-- `GitHub Repository <https://github.com/yourusername/SPADE-FIWARE-Artifacts>`_
-- `Issue Tracker <https://github.com/yourusername/SPADE-FIWARE-Artifacts/issues>`_
+- `GitHub Repository <https://github.com/sosanzma/SPADE-FIWARE-Artifacts>`_
+- `Issue Tracker <https://github.com/sosanzma/SPADE-FIWARE-Artifacts/issues>`_
 - `Release Notes <changelog.html>`_
 
 Get Involved
