@@ -5,6 +5,14 @@ SPADE-FIWARE-Artifacts
     :target: https://spade-fiware-artifacts.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
+.. image:: https://img.shields.io/github/actions/workflow/status/sosanzma/spade-fiware-artifacts/python-app.yml
+        :target: https://github.com/sosanzma/spade-fiware-artifacts/actions
+        :alt: Build Status
+
+.. image:: https://coveralls.io/repos/github/sosanzma/spade-fiware-artifacts/badge.svg?branch=main
+        :target: https://coveralls.io/github/sosanzma/spade-fiware-artifacts?branch=main
+        :alt: Coverage Status
+
 SPADE-FIWARE-Artifacts is a powerful toolkit that bridges the gap between SPADE (Smart Python Agent Development Environment) and FIWARE, specifically focusing on interaction with the Orion and Scorpio Context Brokers. This project provides a set of artifacts that enable SPADE-based multi-agent systems to seamlessly interact with FIWARE's context management capabilities.
 
 Features
