@@ -140,3 +140,13 @@ async def test_entity_exists(inserter_artifact, mock_aiohttp_client_session):
             f"{inserter_artifact.api_url}/{entity_id}",
             headers=inserter_artifact.headers
         )
+
+
+@pytest.mark.asyncio
+async def test_entity_not_exists(inserter_artifact, mock_aiohttp_client_session):
+    entity_id = "urn:ngsi-ld:TestEntity:test1"
+    mock_aiohttp_client_session.get.return_value.__aenter__.return_value.status = 404
+
+    with patch('aiohttp.ClientSession', return_value=mock_aiohttp_client_session):
+        result = await inserter_artifact.entity_exists(entity_id)
+        assert result is False
