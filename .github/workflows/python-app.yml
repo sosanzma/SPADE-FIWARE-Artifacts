@@ -63,16 +63,23 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install -r requirements_dev.txt
         python -m pip install -r requirements.txt
+        pip install coverage
     - name: Run coverage
       run: |
         coverage erase
         coverage run --source=SPADE-FIWARE-Artifacts -m pytest
+        coverage xml
     - name: Upload coverage to Coveralls
       uses: coverallsapp/github-action@v2.2.0
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
+        file: coverage.xml
+        format: cobertura
     - name: Send coverage report to Codecov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
 
   coveralls_finish:
     needs: coverage
