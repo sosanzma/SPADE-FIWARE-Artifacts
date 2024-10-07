@@ -30,9 +30,6 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
         self.watched_attributes = []
 
     async def setup(self):
-        """
-        Sets up the SubscriptionManagerArtifact by making it available.
-        """
         try:
             self.presence.set_available()
         except Exception as e:
@@ -63,15 +60,13 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
         logger.info(json.dumps(filtered_data, indent=2))
 
         # Extract key information
-        notification_id = data['id']
-        entity_id = data['data'][0]['id']
-        notified_at = data['notifiedAt']
+        entity_id = data['data'][0].get('id')
+        notified_at = data.get('notifiedAt')
 
-        # Update the recent notifications
-        self.recent_notifications[entity_id] = {
-            'id': notification_id,
-            'notifiedAt': notified_at
-        }
+        if entity_id and notified_at:
+            self.recent_notifications[entity_id] = {
+                'notifiedAt': notified_at
+            }
 
         return web.Response(text="Notification received and processed")
 
@@ -123,18 +118,13 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.warning("Invalid input. Please enter a number or 'q'.")
 
     async def run(self):
-        """
-        Runs the main loop for managing subscriptions and notifications.
-        """
         local_ip = self.get_local_ip()
         logger.info(f"Local IP: {local_ip}")
 
         async with aiohttp.ClientSession() as session:
-            # Review and delete existing subscriptions
             if input("Would you like to review and delete existing subscriptions? (yes/no): ").lower() == 'yes':
                 await self.review_and_delete_subscriptions(session)
 
-            # Get user input for new subscription
             entity_type = input("Enter the entity type to subscribe to (e.g., WasteContainer): ")
             attributes = input("Enter attributes to watch and receive in notifications (comma-separated, or leave blank for all): ").split(',')
             self.watched_attributes = [attr.strip() for attr in attributes if attr.strip()]
@@ -149,7 +139,6 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             if use_q_filter:
                 q_filter = input("Enter the q filter (e.g., fillingLevel>0.7): ")
 
-            # Prepare subscription data
             subscription_data = {
                 "type": "Subscription",
                 "entities": [{"type": entity_type}],
@@ -176,12 +165,10 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.info("Subscription data:")
             logger.info(json.dumps(subscription_data, indent=2))
 
-            # Create new subscription
             subscription_id = await self.create_subscription(session, subscription_data)
             if subscription_id:
                 logger.info(f"Subscription ID: {subscription_id}")
 
-            # Set up notification server
             app = web.Application()
             app.router.add_post("/notify", self.handle_notification)
             runner = web.AppRunner(app)
@@ -192,7 +179,6 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.info(f"Notification server is running on http://{local_ip}:9999")
             logger.info("Press Ctrl+C to exit")
 
-            # Keep the server running
             while True:
                 await asyncio.sleep(1)
 
