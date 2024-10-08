@@ -35,7 +35,8 @@ Table of Contents
 
 
 
-   example
+   example_inserter
+   example_subs_manager
    spade
    future_work
 
