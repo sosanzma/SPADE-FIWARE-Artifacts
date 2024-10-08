@@ -32,11 +32,11 @@ async def main():
 
     XMPP_SERVER = config["XMPP_SERVER"]
     broker_port = config["broker_port"]
-    subscriber_artifact_name = config["publisher_artifact_name"]
+    subscriber_artifact_name = config["subscriber_artifact_name"]
     subscriber_artifact_jid = f"{subscriber_artifact_name}@{XMPP_SERVER}"
     subscriber_artifact_passwd = getpass(prompt="Password for publisher artifact> ")
 
-    artifact = SubscriptionManagerArtifact(subscriber_artifact_jid, subscriber_artifact_passwd, broker_port=broker_port)
+    artifact = SubscriptionManagerArtifact(subscriber_artifact_jid, subscriber_artifact_passwd, broker_url=broker_port)
 
     agent_jid = f"agent_notification@{XMPP_SERVER}"
     agent_passwd  = getpass(prompt="Password for agent who receives the notification> ")
