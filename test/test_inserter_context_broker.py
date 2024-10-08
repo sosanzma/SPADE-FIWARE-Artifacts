@@ -126,3 +126,17 @@ async def test_update_or_create_entity_new(inserter_artifact):
         with patch.object(inserter_artifact, 'create_new_entity', new_callable=AsyncMock) as mock_create:
             await inserter_artifact.update_or_create_entity(entity_id, entity_data, payload)
             mock_create.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_entity_exists(inserter_artifact, mock_aiohttp_client_session):
+    entity_id = "urn:ngsi-ld:TestEntity:test1"
+    mock_aiohttp_client_session.get.return_value.__aenter__.return_value.status = 200
+
+    with patch('aiohttp.ClientSession', return_value=mock_aiohttp_client_session):
+        result = await inserter_artifact.entity_exists(entity_id)
+        assert result is True
+        mock_aiohttp_client_session.get.assert_called_once_with(
+            f"{inserter_artifact.api_url}/{entity_id}",
+            headers=inserter_artifact.headers
+        )
