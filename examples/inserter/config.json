@@ -1,7 +1,7 @@
 {
-    "XMPP_SERVER": "<Your XMPP server address>",
-    "publisher_artifact_name": "<Name for the publisher artifact>",
-    "subscriber_artifact_name": "<Name for the subscriber artifact>",
-    "host": "<Your Context Broker host address>",
-    "project_name": "<Your project name>"
+    "XMPP_SERVER": "158.42.153.235",
+    "publisher_artifact_name": "publisher_artifact",
+    "subscriber_artifact_name": "subscriber_artifact",
+    "host": "localhost",
+    "project_name": "ngb"
 }

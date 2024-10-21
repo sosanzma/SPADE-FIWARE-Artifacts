@@ -57,8 +57,7 @@ class InserterArtifact(spade_artifact.Artifact):
 
         self.api_url = f"http://{host}:{port}/ngsi-ld/v1/entities"
         self.headers = {
-            "Content-Type": "application/ld+json",
-            "NGSILD-Tenant": project_name
+            "Content-Type": "application/ld+json"
         }
         self.publisher_jid = publisher_jid
         self.columns_update = columns_update
@@ -77,7 +76,12 @@ class InserterArtifact(spade_artifact.Artifact):
         Raises:
             Exception: If linking to the publisher fails.
         """
-        self.presence.set_available()
+        try:
+            self.presence.set_available()
+
+        except Exception as e:
+            print(e)
+
         await asyncio.sleep(1)
 
         try:
