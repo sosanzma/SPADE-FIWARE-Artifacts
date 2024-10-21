@@ -11,35 +11,55 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
     """
     An artifact for managing subscriptions in a Context Broker.
 
-    This class allows the creation, deletion, and management of subscriptions to a Context Broker instance, as well as handling incoming notifications.
-
-    Attributes:
-        broker_url (str): The URL of the Context Broker.
-        recent_notifications (dict): Dictionary to store recent notifications.
-        watched_attributes (list): List of attributes to watch for notifications.
-
-    Args:
-        jid (str): Jabber ID for the artifact.
-        passwd (str): Password for the artifact's Jabber ID.
-        broker_url (str): The URL of the Context Broker.
+    This class allows the creation, deletion, and management of subscriptions to a Context Broker instance,
+    as well as handling incoming notifications.
     """
+
     def __init__(self, jid, passwd, broker_url="http://localhost:9090"):
+        """
+        Initializes the SubscriptionManagerArtifact.
+
+        Args:
+            jid (str): Jabber ID for the artifact.
+            passwd (str): Password for the artifact's Jabber ID.
+            broker_url (str, optional): The URL of the Context Broker. Defaults to "http://localhost:9090".
+        """
         super().__init__(jid, passwd)
         self.broker_url = broker_url
         self.recent_notifications = {}
         self.watched_attributes = []
 
     async def setup(self):
+        """
+        Sets the presence of the artifact to available.
+
+        Attempts to set the presence status to available and logs an error if it fails.
+        """
         try:
             self.presence.set_available()
         except Exception as e:
             logger.error(f"Failed to set presence: {str(e)}")
 
     async def create_subscription(self, session, subscription_data):
+        """
+        Creates a subscription with the Context Broker.
+
+        Sends a POST request to the Context Broker to create a new subscription with the provided data.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the request.
+            subscription_data (dict): The data for the subscription to be created.
+
+        Returns:
+            str or None: The Location header from the response if the subscription is created successfully;
+                         otherwise, None.
+        """
         try:
-            async with session.post(f"{self.broker_url}/ngsi-ld/v1/subscriptions",
-                                    headers={"Content-Type": "application/ld+json"},
-                                    json=subscription_data) as response:
+            async with session.post(
+                f"{self.broker_url}/ngsi-ld/v1/subscriptions",
+                headers={"Content-Type": "application/ld+json"},
+                json=subscription_data
+            ) as response:
                 if response.status == 201:
                     logger.info("Subscription created successfully")
                     return response.headers.get('Location')
@@ -54,6 +74,18 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return None
 
     async def handle_notification(self, request):
+        """
+        Handles incoming notifications from the Context Broker.
+
+        Processes the notification data, filters it based on watched attributes, logs the information,
+        updates recent notifications, and publishes the data.
+
+        Args:
+            request (aiohttp.web.Request): The incoming HTTP request containing the notification.
+
+        Returns:
+            aiohttp.web.Response: A response indicating the result of processing the notification.
+        """
         try:
             data = await request.json()
             logger.info("Received notification")
@@ -61,7 +93,10 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             # Filter the notification data to include only watched attributes
             filtered_data = data.copy()
             for entity in filtered_data.get('data', []):
-                filtered_entity = {k: v for k, v in entity.items() if k in self.watched_attributes or k in ['id', 'type']}
+                filtered_entity = {
+                    k: v for k, v in entity.items()
+                    if k in self.watched_attributes or k in ['id', 'type']
+                }
                 entity.clear()
                 entity.update(filtered_entity)
 
@@ -87,15 +122,30 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return web.Response(status=500, text="Internal Server Error")
 
     async def get_active_subscriptions(self, session):
+        """
+        Retrieves all active subscriptions from the Context Broker.
+
+        Sends a GET request to the Context Broker to fetch active subscriptions and logs their details.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the request.
+
+        Returns:
+            list: A list of active subscriptions if the request is successful; otherwise, an empty list.
+        """
         try:
-            async with session.get(f"{self.broker_url}/ngsi-ld/v1/subscriptions",
-                                   headers={"Accept": "application/ld+json"}) as response:
+            async with session.get(
+                f"{self.broker_url}/ngsi-ld/v1/subscriptions",
+                headers={"Accept": "application/ld+json"}
+            ) as response:
                 if response.status == 200:
                     subscriptions = await response.json()
                     logger.info("Active subscriptions:")
                     for i, sub in enumerate(subscriptions, 1):
                         logger.info(
-                            f"{i}. ID: {sub['id']}, Entities: {sub.get('entities', 'N/A')}, WatchedAttributes: {sub.get('watchedAttributes', 'N/A')}")
+                            f"{i}. ID: {sub['id']}, Entities: {sub.get('entities', 'N/A')}, "
+                            f"WatchedAttributes: {sub.get('watchedAttributes', 'N/A')}"
+                        )
                     return subscriptions
                 else:
                     logger.error(f"Failed to retrieve subscriptions: {await response.text()}")
@@ -108,9 +158,23 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return []
 
     async def delete_subscription(self, session, subscription_id):
+        """
+        Deletes a specific subscription from the Context Broker.
+
+        Sends a DELETE request to remove the subscription with the given ID.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the request.
+            subscription_id (str): The ID of the subscription to be deleted.
+
+        Returns:
+            bool: True if the subscription was deleted successfully; False otherwise.
+        """
         try:
-            async with session.delete(f"{self.broker_url}/ngsi-ld/v1/subscriptions/{subscription_id}",
-                                      headers={"Accept": "application/ld+json"}) as response:
+            async with session.delete(
+                f"{self.broker_url}/ngsi-ld/v1/subscriptions/{subscription_id}",
+                headers={"Accept": "application/ld+json"}
+            ) as response:
                 if response.status == 204:
                     logger.info(f"Subscription {subscription_id} deleted successfully")
                     return True
@@ -125,6 +189,14 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return False
 
     async def review_and_delete_subscriptions(self, session):
+        """
+        Allows the user to review and delete existing subscriptions.
+
+        Retrieves active subscriptions and prompts the user to select and delete a subscription.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for retrieving and deleting subscriptions.
+        """
         subscriptions = await self.get_active_subscriptions(session)
         if not subscriptions:
             logger.info("No active subscriptions found.")
@@ -148,6 +220,14 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.warning("Invalid input. Please enter a number or 'q'.")
 
     async def run(self):
+        """
+        Runs the SubscriptionManagerArtifact.
+
+        Sets up the presence, optionally reviews and deletes existing subscriptions,
+        prompts the user to create a new subscription, and starts the notification server.
+
+        The server listens for incoming notifications on the specified port and handles them accordingly.
+        """
         try:
             self.presence.set_available()
 
@@ -159,7 +239,9 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                     await self.review_and_delete_subscriptions(session)
 
                 entity_type = input("\n Enter the entity type to subscribe to (e.g., WasteContainer): ")
-                attributes = input("\n Enter attributes to watch and receive in notifications (comma-separated, or leave blank for all): ").split(',')
+                attributes = input(
+                    "\n Enter attributes to watch and receive in notifications (comma-separated, or leave blank for all): "
+                ).split(',')
                 self.watched_attributes = [attr.strip() for attr in attributes if attr.strip()]
 
                 entity_id = input("\n Enter a specific entity ID to subscribe to (or leave blank for all): ").strip()
@@ -182,7 +264,8 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                         }
                     },
                     "@context": [
-                        "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"]
+                        "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
+                    ]
                 }
 
                 if entity_id:
@@ -218,6 +301,15 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.error(f"An error occurred while running the artifact: {str(e)}")
 
     def get_local_ip(self):
+        """
+        Retrieves the local IP address of the machine.
+
+        Creates a UDP socket connection to a remote address to determine the local IP address.
+        If it fails, defaults to '127.0.0.1'.
+
+        Returns:
+            str: The local IP address.
+        """
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             s.connect(('10.255.255.255', 1))
@@ -229,6 +321,18 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
         return IP
 
     def format_entity_id(self, entity_type, entity_id):
+        """
+        Formats the entity ID to adhere to the NGSI-LD standard.
+
+        Ensures that the entity ID starts with the 'urn:ngsi-ld:' prefix. If not, it adds the prefix.
+
+        Args:
+            entity_type (str): The type of the entity.
+            entity_id (str): The original entity ID.
+
+        Returns:
+            str: The formatted entity ID.
+        """
         if entity_id and not entity_id.startswith("urn:ngsi-ld:"):
             return f"urn:ngsi-ld:{entity_type}:{entity_id}"
         return entity_id
