@@ -1,6 +1,6 @@
 {
     "type": "WasteContainer",
-    "id": "002",
+    "id": "088",
     "coordinates": [20.4168, -20.7038],
     "country": "Spain",
     "locality": "Valencia",
@@ -8,6 +8,7 @@
     "street_number": "56",
     "status": "no-active",
     "waste_kind" : "Organic",
-    "provider" : "Jose"
+    "provider" : "Jose",
+    "filling_level": 0.71
 
 }
