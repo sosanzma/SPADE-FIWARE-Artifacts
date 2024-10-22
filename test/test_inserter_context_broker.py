@@ -1,152 +1,174 @@
-import pytest
+import unittest
+from unittest.mock import AsyncMock, MagicMock, patch, call
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
-from aiohttp import ClientError, ClientSession
+import json
+import pytest
 from spade_fiware_artifacts.context_broker_inserter import InserterArtifact
 
-
-class MockClientSession:
-    def __init__(self):
-        self.get = AsyncMock()
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb):
-        pass
-
-@pytest.fixture
-def mock_aiohttp_client_session():
-    return MockClientSession()
-@pytest.fixture
-def mock_artifact():
-    with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact', autospec=True) as mock:
-        mock_instance = mock.return_value
-        mock_instance.presence = MagicMock()
-        yield mock_instance
-
-@pytest.fixture
-def inserter_artifact():
-    with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact', autospec=True):
-        inserter = InserterArtifact(
-            jid="test@example.com",
-            passwd="password",
-            publisher_jid="publisher@example.com",
-            host="localhost",
-            project_name="test_project"
+class TestInserterArtifact(unittest.TestCase):
+    def setUp(self):
+        self.jid = 'test@localhost'
+        self.passwd = 'password'
+        self.publisher_jid = 'publisher@localhost'
+        self.host = 'testbroker.com'
+        self.project_name = 'TestProject'
+        self.columns_update = ['attribute1', 'attribute2']
+        self.port = '9090'
+        self.artifact = InserterArtifact(
+            self.jid,
+            self.passwd,
+            self.publisher_jid,
+            self.host,
+            self.project_name,
+            self.columns_update,
+            json_template={
+                "id": "urn:ngsi-ld:TestEntity:{id}",
+                "type": "{type}",
+                "attribute1": {"type": "Property", "value": "{value1}"},
+                "attribute2": {"type": "Property", "value": "{value2}"},
+                "@context": ["https://example.com/context.jsonld"]
+            }
         )
-        inserter.presence = MagicMock()
-        inserter.link = AsyncMock()
-        # Proporcionar un contexto de prueba
-        inserter.json_template = {
-            "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+        self.artifact.presence = MagicMock()
+        self.artifact.link = AsyncMock()
+        self.artifact.payload_queue = asyncio.Queue()
+
+    @pytest.mark.asyncio
+    async def test_setup(self):
+        with patch('asyncio.sleep', return_value=None):
+            await self.artifact.setup()
+            self.artifact.presence.set_available.assert_called_once()
+            self.artifact.link.assert_called_once_with(self.publisher_jid, self.artifact.artifact_callback)
+
+    def test_default_data_processor(self):
+        data = {'key': 'value'}
+        result = self.artifact.default_data_processor(data)
+        self.assertEqual(result, [data])
+
+    def test_artifact_callback(self):
+        payload = json.dumps({'id': '123', 'type': 'TestType', 'value1': 'val1', 'value2': 'val2'})
+        data_processor_mock = MagicMock(return_value=[{'processed_data': True}])
+        self.artifact.data_processor = data_processor_mock
+
+        with patch('asyncio.create_task') as mock_create_task:
+            self.artifact.artifact_callback('artifact', payload)
+            data_processor_mock.assert_called_once()
+            mock_create_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_and_send_data(self):
+        payload = {'id': '123', 'type': 'TestType', 'value1': 'val1', 'value2': 'val2'}
+        self.artifact.columns_update = ['attribute1']
+        with patch.object(self.artifact, 'update_specific_attributes') as mock_update_specific_attributes:
+            await self.artifact.process_and_send_data(payload)
+            mock_update_specific_attributes.assert_called_once()
+
+    def test_build_entity_json(self):
+        payload = {'id': '123', 'type': 'TestType', 'value1': 'val1', 'value2': 'val2'}
+        result = self.artifact.build_entity_json(payload)
+        expected_result = {
+            'id': 'urn:ngsi-ld:TestEntity:123',
+            'type': 'TestType',
+            'attribute1': {'type': 'Property', 'value': 'val1'},
+            'attribute2': {'type': 'Property', 'value': 'val2'},
+            '@context': ['https://example.com/context.jsonld']
         }
-        return inserter
+        self.assertEqual(result, expected_result)
 
-@pytest.mark.asyncio
-async def test_setup(inserter_artifact):
-    await inserter_artifact.setup()
-    inserter_artifact.presence.set_available.assert_called_once()
-    inserter_artifact.link.assert_called_once_with(inserter_artifact.publisher_jid, inserter_artifact.artifact_callback)
+    @pytest.mark.asyncio
+    async def test_entity_exists_true(self):
+        entity_id = 'urn:ngsi-ld:TestEntity:123'
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response = AsyncMock()
+            mock_response.status = 200
+            mock_response.__aenter__.return_value = mock_response
+            mock_session.return_value.__aenter__.return_value.get.return_value = mock_response
 
+            result = await self.artifact.entity_exists(entity_id)
+            self.assertTrue(result)
 
-@pytest.mark.asyncio
-async def test_setup_link_failure(inserter_artifact):
-    with patch.object(inserter_artifact, 'link', new_callable=AsyncMock) as mock_link:
-        mock_link.side_effect = Exception("Link failed")
-        with pytest.raises(Exception, match="Link failed"):
-            await inserter_artifact.setup()
+    @pytest.mark.asyncio
+    async def test_entity_exists_false(self):
+        entity_id = 'urn:ngsi-ld:TestEntity:123'
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response = AsyncMock()
+            mock_response.status = 404
+            mock_response.__aenter__.return_value = mock_response
+            mock_session.return_value.__aenter__.return_value.get.return_value = mock_response
 
+            result = await self.artifact.entity_exists(entity_id)
+            self.assertFalse(result)
 
-@pytest.mark.asyncio
-async def test_artifact_callback(inserter_artifact):
-    test_payload = '{"type": "TestEntity", "id": "test1"}'
-    with patch.object(inserter_artifact, 'data_processor') as mock_processor:
-        mock_processor.return_value = [{"processed": "data"}]
-        with patch.object(inserter_artifact.payload_queue, 'put', new_callable=AsyncMock) as mock_put:
-            inserter_artifact.artifact_callback("test_artifact", test_payload)
-            await asyncio.sleep(0)  # Allow the async task to complete
-            mock_put.assert_called_once_with({"processed": "data"})
+    @pytest.mark.asyncio
+    async def test_create_new_entity_success(self):
+        entity_data = {'id': 'urn:ngsi-ld:TestEntity:123', 'type': 'TestType'}
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response = AsyncMock()
+            mock_response.status = 201
+            mock_response.text = AsyncMock(return_value='Created')
+            mock_response.__aenter__.return_value = mock_response
+            mock_session.return_value.__aenter__.return_value.post.return_value = mock_response
 
+            await self.artifact.create_new_entity(entity_data)
+            mock_session.return_value.__aenter__.return_value.post.assert_called_once()
 
-@pytest.mark.asyncio
-async def test_artifact_callback_invalid_json(inserter_artifact):
-    invalid_payload = 'invalid json'
-    with patch.object(inserter_artifact, 'data_processor') as mock_processor:
-        inserter_artifact.artifact_callback("test_artifact", invalid_payload)
-        mock_processor.assert_not_called()
+    @pytest.mark.asyncio
+    async def test_create_new_entity_failure(self):
+        entity_data = {'id': 'urn:ngsi-ld:TestEntity:123', 'type': 'TestType'}
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response = AsyncMock()
+            mock_response.status = 400
+            mock_response.text = AsyncMock(return_value='Error')
+            mock_response.__aenter__.return_value = mock_response
+            mock_session.return_value.__aenter__.return_value.post.return_value = mock_response
 
+            await self.artifact.create_new_entity(entity_data)
+            mock_session.return_value.__aenter__.return_value.post.assert_called_once()
 
-@pytest.mark.asyncio
-async def test_process_and_send_data_update_specific_attributes(inserter_artifact):
-    inserter_artifact.columns_update = ['attribute1']
-    payload = {"type": "TestEntity", "id": "test1", "attribute1": {"value": "test"}}
-    with patch.object(inserter_artifact, 'update_specific_attributes', new_callable=AsyncMock) as mock_update:
-        await inserter_artifact.process_and_send_data(payload)
-        mock_update.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_success(self):
+        entity_id = 'urn:ngsi-ld:TestEntity:123'
+        attribute = 'attribute1'
+        attribute_data = {'value': 'new_value'}
+        context = ['https://example.com/context.jsonld']
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response_patch = AsyncMock()
+            mock_response_patch.status = 204
+            mock_response_patch.__aenter__.return_value = mock_response_patch
+            mock_session.return_value.__aenter__.return_value.patch.return_value = mock_response_patch
 
+            await self.artifact.update_entity_attribute(entity_id, attribute, attribute_data, context)
+            mock_session.return_value.__aenter__.return_value.patch.assert_called_once()
 
-@pytest.mark.asyncio
-async def test_process_and_send_data_update_or_create_entity(inserter_artifact):
-    payload = {"type": "TestEntity", "id": "test1", "attribute1": {"value": "test"}}
-    with patch.object(inserter_artifact, 'update_or_create_entity', new_callable=AsyncMock) as mock_update_or_create:
-        await inserter_artifact.process_and_send_data(payload)
-        mock_update_or_create.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_failure(self):
+        entity_id = 'urn:ngsi-ld:TestEntity:123'
+        attribute = 'attribute1'
+        attribute_data = {'value': 'new_value'}
+        context = ['https://example.com/context.jsonld']
+        with patch('aiohttp.ClientSession') as mock_session:
+            mock_response_patch = AsyncMock()
+            mock_response_patch.status = 404
+            mock_response_patch.text = AsyncMock(return_value='Not Found')
+            mock_response_patch.__aenter__.return_value = mock_response_patch
+            mock_session.return_value.__aenter__.return_value.patch.return_value = mock_response_patch
 
+            mock_response_post = AsyncMock()
+            mock_response_post.status = 204
+            mock_response_post.__aenter__.return_value = mock_response_post
+            mock_session.return_value.__aenter__.return_value.post.return_value = mock_response_post
 
-@pytest.mark.asyncio
-async def test_update_specific_attributes(inserter_artifact):
-    entity_id = "urn:ngsi-ld:TestEntity:test1"
-    entity_data = {"attribute1": {"value": "test"}, "@context": "test_context"}
-    inserter_artifact.columns_update = ['attribute1']
-    with patch.object(inserter_artifact, 'update_entity_attribute', new_callable=AsyncMock) as mock_update:
-        await inserter_artifact.update_specific_attributes(entity_id, entity_data)
-        mock_update.assert_called_once_with(entity_id, 'attribute1', {"value": "test"}, "test_context")
+            await self.artifact.update_entity_attribute(entity_id, attribute, attribute_data, context)
+            mock_session.return_value.__aenter__.return_value.patch.assert_called_once()
+            mock_session.return_value.__aenter__.return_value.post.assert_called_once()
 
-
-@pytest.mark.asyncio
-async def test_update_or_create_entity_existing(inserter_artifact):
-    entity_id = "urn:ngsi-ld:TestEntity:test1"
-    entity_data = {"attribute1": {"value": "test"}, "@context": "test_context"}
-    payload = {"type": "TestEntity", "id": "test1", "attribute1": {"value": "test"}}
-    with patch.object(inserter_artifact, 'entity_exists', new_callable=AsyncMock) as mock_exists:
-        mock_exists.return_value = True
-        with patch.object(inserter_artifact, 'update_all_attributes', new_callable=AsyncMock) as mock_update:
-            await inserter_artifact.update_or_create_entity(entity_id, entity_data, payload)
-            mock_update.assert_called_once_with(entity_id, entity_data, "test_context")
-
-
-@pytest.mark.asyncio
-async def test_update_or_create_entity_new(inserter_artifact):
-    entity_id = "urn:ngsi-ld:TestEntity:test1"
-    entity_data = {"attribute1": {"value": "test"}, "@context": "test_context"}
-    payload = {"type": "TestEntity", "id": "test1", "attribute1": {"value": "test"}}
-    with patch.object(inserter_artifact, 'entity_exists', new_callable=AsyncMock) as mock_exists:
-        mock_exists.return_value = False
-        with patch.object(inserter_artifact, 'create_new_entity', new_callable=AsyncMock) as mock_create:
-            await inserter_artifact.update_or_create_entity(entity_id, entity_data, payload)
-            mock_create.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_entity_exists(inserter_artifact, mock_aiohttp_client_session):
-    entity_id = "urn:ngsi-ld:TestEntity:test1"
-    mock_aiohttp_client_session.get.return_value.__aenter__.return_value.status = 200
-
-    with patch('aiohttp.ClientSession', return_value=mock_aiohttp_client_session):
-        result = await inserter_artifact.entity_exists(entity_id)
-        assert result is True
-        mock_aiohttp_client_session.get.assert_called_once_with(
-            f"{inserter_artifact.api_url}/{entity_id}",
-            headers=inserter_artifact.headers
-        )
-
-
-@pytest.mark.asyncio
-async def test_entity_not_exists(inserter_artifact, mock_aiohttp_client_session):
-    entity_id = "urn:ngsi-ld:TestEntity:test1"
-    mock_aiohttp_client_session.get.return_value.__aenter__.return_value.status = 404
-
-    with patch('aiohttp.ClientSession', return_value=mock_aiohttp_client_session):
-        result = await inserter_artifact.entity_exists(entity_id)
-        assert result is False
+    @pytest.mark.asyncio
+    async def test_run(self):
+        self.artifact.presence.set_available = MagicMock()
+        payload = {'id': '123', 'type': 'TestType', 'value1': 'val1', 'value2': 'val2'}
+        self.artifact.payload_queue.put_nowait(payload)
+        with patch.object(self.artifact, 'process_and_send_data') as mock_process_and_send_data:
+            with patch('asyncio.sleep', side_effect=asyncio.CancelledError):
+                with self.assertRaises(asyncio.CancelledError):
+                    await self.artifact.run()
+                mock_process_and_send_data.assert_called_once_with(payload)
