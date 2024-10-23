@@ -15,7 +15,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
     as well as handling incoming notifications.
     """
 
-    def __init__(self, jid, passwd, broker_url="http://localhost:9090"):
+    def __init__(self, jid, passwd, config, broker_url="http://localhost:9090"):
         """
         Initializes the SubscriptionManagerArtifact.
 
@@ -28,6 +28,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
         self.broker_url = broker_url
         self.recent_notifications = {}
         self.watched_attributes = []
+        self.config = config
 
     async def setup(self):
         """
@@ -220,14 +221,6 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.warning("Invalid input. Please enter a number or 'q'.")
 
     async def run(self):
-        """
-        Runs the SubscriptionManagerArtifact.
-
-        Sets up the presence, optionally reviews and deletes existing subscriptions,
-        prompts the user to create a new subscription, and starts the notification server.
-
-        The server listens for incoming notifications on the specified port and handles them accordingly.
-        """
         try:
             self.presence.set_available()
 
@@ -235,46 +228,36 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.info(f"Local IP: {local_ip}")
 
             async with aiohttp.ClientSession() as session:
-                if input("\n Would you like to review and delete existing subscriptions? (yes/no): ").lower() == 'yes':
-                    await self.review_and_delete_subscriptions(session)
-
-                entity_type = input("\n Enter the entity type to subscribe to (e.g., WasteContainer): ")
-                attributes = input(
-                    "\n Enter attributes to watch and receive in notifications (comma-separated, or leave blank for all): "
-                ).split(',')
-                self.watched_attributes = [attr.strip() for attr in attributes if attr.strip()]
-
-                entity_id = input("\n Enter a specific entity ID to subscribe to (or leave blank for all): ").strip()
-                if entity_id:
-                    entity_id = self.format_entity_id(entity_type, entity_id)
-                    logger.info(f"\n Formatted entity ID: {entity_id}")
-
-                use_q_filter = input("\n Do you want to use a q filter? (yes/no): ").lower() == 'yes'
-                q_filter = ""
-                if use_q_filter:
-                    q_filter = input("\n Enter the q filter (e.g., fillingLevel>0.7): ")
-
                 subscription_data = {
                     "type": "Subscription",
-                    "entities": [{"type": entity_type}],
+                    "entities": [{"type": self.config.get("entity_type")}],
                     "notification": {
                         "endpoint": {
                             "uri": f"http://{local_ip}:9999/notify",
                             "accept": "application/json"
                         }
                     },
-                    "@context": [ #TODO: Falta por generalizaz el contexto
+                    "@context": self.config.get("context", [
                         "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
-                    ]
+                    ])
                 }
 
+                entity_id = self.config.get("entity_id", "").strip()
                 if entity_id:
-                    subscription_data["entities"][0]["id"] = entity_id
+                    formatted_entity_id = self.format_entity_id(self.config.get("entity_type"), entity_id)
+                    subscription_data["entities"][0]["id"] = formatted_entity_id
+                    logger.info(f"Formatted entity ID: {formatted_entity_id}")
 
-                if self.watched_attributes:
-                    subscription_data["watchedAttributes"] = self.watched_attributes
-                    subscription_data["notification"]["attributes"] = self.watched_attributes
+                watched_attributes = self.config.get("watched_attributes", [])
+                if watched_attributes:
+                    subscription_data["watchedAttributes"] = watched_attributes
+                    subscription_data["notification"]["attributes"] = watched_attributes
+                    self.watched_attributes = watched_attributes
+                else:
+                    self.watched_attributes = []
 
+
+                q_filter = self.config.get("q_filter", "").strip()
                 if q_filter:
                     subscription_data["q"] = q_filter
 
