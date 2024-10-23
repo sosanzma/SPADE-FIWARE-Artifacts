@@ -26,30 +26,67 @@ class Agent_notification(ArtifactMixin, Agent):
 
 
 async def main():
+    """
+    Función principal que inicia el artefacto y el agente.
+    """
+    # Cargar la configuración general
+    try:
+        with open('config.json', 'r') as config_file:
+            config = json.load(config_file)
+    except FileNotFoundError:
+        logger.error("El archivo config.json no fue encontrado.")
+        return
+    except json.JSONDecodeError as e:
+        logger.error(f"Error al parsear config.json: {str(e)}")
+        return
 
-    with open('config.json', 'r') as config_file:
-        config = json.load(config_file)
+    # Cargar la configuración de la suscripción
+    try:
+        with open('payload.json', 'r') as payload_file:
+            payload = json.load(payload_file)
+    except FileNotFoundError:
+        logger.error("El archivo payload.json no fue encontrado.")
+        return
+    except json.JSONDecodeError as e:
+        logger.error(f"Error al parsear payload.json: {str(e)}")
+        return
 
-    XMPP_SERVER = config["XMPP_SERVER"]
-    broker_port = config["broker_port"]
-    subscriber_artifact_name = config["subscriber_artifact_name"]
+    XMPP_SERVER = config.get("XMPP_SERVER")
+    broker_url = config.get("broker_url")
+    subscriber_artifact_name = config.get("subscriber_artifact_name")
+
+    if not all([XMPP_SERVER, broker_url, subscriber_artifact_name]):
+        logger.error("Faltan configuraciones en config.json.")
+        return
+
     subscriber_artifact_jid = f"{subscriber_artifact_name}@{XMPP_SERVER}"
-    subscriber_artifact_passwd = getpass(prompt="Password for publisher artifact> ")
+    subscriber_artifact_passwd = getpass(prompt="Password for subscriber artifact> ")
 
-    artifact = SubscriptionManagerArtifact(subscriber_artifact_jid, subscriber_artifact_passwd, broker_url=broker_port)
+    artifact = SubscriptionManagerArtifact(
+        jid=subscriber_artifact_jid,
+        passwd=subscriber_artifact_passwd,
+        config=payload,
+        broker_url=broker_url
+    )
 
     agent_jid = f"agent_notification@{XMPP_SERVER}"
     agent_passwd  = getpass(prompt="Password for agent who receives the notification> ")
+
     try:
         await artifact.start()
 
         agent = Agent_notification(jid=agent_jid, password=agent_passwd, artifact_jid=subscriber_artifact_jid)
         await agent.start()
-        await artifact.join()
+
+        logger.info("Artefacto y agente iniciados correctamente.")
+
+        while True:
+            await asyncio.sleep(1)
+    except Exception as e:
+        logger.error(f"Se produjo un error en la función principal: {str(e)}")
+    finally:
         await artifact.stop()
         await agent.stop()
-    except Exception as e:
-        logger.error(f"An error occurred in the main function: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

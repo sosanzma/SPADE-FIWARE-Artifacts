@@ -1,0 +1,9 @@
+{
+    "entity_type": "WasteContainer",
+    "entity_id": "088",
+    "watched_attributes": ["fillingLevel", "temperature"],
+    "q_filter": "fillingLevel>0.7",
+    "context": [
+        "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
+    ]
+}
