@@ -1,5 +1,5 @@
 {
-    "XMPP_SERVER": "your_xmpp_server_address",
-    "subscriber_artifact_name": "subscriber_artifact_name",
-    "broker_port": "http://your_broker_address:9090"
+    "XMPP_SERVER": "158.42.153.235",
+    "subscriber_artifact_name": "subscriber",
+    "broker_port": "http://localhost:9090"
 }
