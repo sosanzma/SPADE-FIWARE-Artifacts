@@ -263,7 +263,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                             "accept": "application/json"
                         }
                     },
-                    "@context": [
+                    "@context": [ #TODO: Falta por generalizaz el contexto
                         "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
                     ]
                 }
