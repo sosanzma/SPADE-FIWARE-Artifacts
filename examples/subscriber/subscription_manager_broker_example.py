@@ -52,7 +52,7 @@ async def main():
         return
 
     XMPP_SERVER = config.get("XMPP_SERVER")
-    broker_url = config.get("broker_url")
+    broker_url = config.get("broker_port")
     subscriber_artifact_name = config.get("subscriber_artifact_name")
 
     if not all([XMPP_SERVER, broker_url, subscriber_artifact_name]):
