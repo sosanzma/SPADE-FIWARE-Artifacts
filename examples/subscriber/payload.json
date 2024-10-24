@@ -5,5 +5,8 @@
     "q_filter": "fillingLevel>0.7",
     "context": [
         "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
-    ]
+    ],
+    "delete_all_subscriptions": true,
+    "delete_similar_subscriptions": false,
+    "update_existing_subscription": false
 }

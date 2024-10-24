@@ -22,6 +22,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
         Args:
             jid (str): Jabber ID for the artifact.
             passwd (str): Password for the artifact's Jabber ID.
+            config (dict): Configuration dictionary containing subscription details.
             broker_url (str, optional): The URL of the Context Broker. Defaults to "http://localhost:9090".
         """
         super().__init__(jid, passwd)
@@ -141,12 +142,6 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             ) as response:
                 if response.status == 200:
                     subscriptions = await response.json()
-                    logger.info("Active subscriptions:")
-                    for i, sub in enumerate(subscriptions, 1):
-                        logger.info(
-                            f"{i}. ID: {sub['id']}, Entities: {sub.get('entities', 'N/A')}, "
-                            f"WatchedAttributes: {sub.get('watchedAttributes', 'N/A')}"
-                        )
                     return subscriptions
                 else:
                     logger.error(f"Failed to retrieve subscriptions: {await response.text()}")
@@ -189,36 +184,92 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.error(f"Unexpected error occurred: {str(e)}")
             return False
 
-    async def review_and_delete_subscriptions(self, session):
+    async def delete_all_subscriptions(self, session):
         """
-        Allows the user to review and delete existing subscriptions.
-
-        Retrieves active subscriptions and prompts the user to select and delete a subscription.
+        Deletes all active subscriptions from the Context Broker.
 
         Args:
-            session (aiohttp.ClientSession): The HTTP session to use for retrieving and deleting subscriptions.
+            session (aiohttp.ClientSession): The HTTP session to use for the requests.
         """
-        subscriptions = await self.get_active_subscriptions(session)
-        if not subscriptions:
-            logger.info("No active subscriptions found.")
-            return
-
-        choice = input("Enter the number of the subscription you want to delete, or 'q' to quit: ")
-        if choice.lower() == 'q':
-            return
-
         try:
-            index = int(choice) - 1
-            if 0 <= index < len(subscriptions):
-                subscription_id = subscriptions[index]['id']
-                if await self.delete_subscription(session, subscription_id):
-                    logger.info(f"Subscription {subscription_id} has been deleted.")
+            subscriptions = await self.get_active_subscriptions(session)
+            if not subscriptions:
+                logger.info("No active subscriptions to delete.")
+                return
+
+            for sub in subscriptions:
+                subscription_id = sub['id']
+                await self.delete_subscription(session, subscription_id)
+            logger.info("All subscriptions have been deleted.")
+        except Exception as e:
+            logger.error(f"Error deleting all subscriptions: {str(e)}")
+
+    async def find_similar_subscriptions(self, session, subscription_data):
+        """
+        Finds subscriptions that are similar to the provided subscription data.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the request.
+            subscription_data (dict): The subscription data to compare with existing subscriptions.
+
+        Returns:
+            list: A list of similar subscriptions.
+        """
+        try:
+            active_subscriptions = await self.get_active_subscriptions(session)
+            similar_subscriptions = []
+            for sub in active_subscriptions:
+                if (sub.get('entities') == subscription_data.get('entities') and
+                    sub.get('watchedAttributes') == subscription_data.get('watchedAttributes') and
+                    sub.get('q') == subscription_data.get('q')):
+                    similar_subscriptions.append(sub)
+            return similar_subscriptions
+        except Exception as e:
+            logger.error(f"Error finding similar subscriptions: {str(e)}")
+            return []
+
+    async def delete_similar_subscriptions(self, session, similar_subscriptions):
+        """
+        Deletes subscriptions that are similar to the provided list.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the requests.
+            similar_subscriptions (list): A list of subscriptions to delete.
+        """
+        for sub in similar_subscriptions:
+            subscription_id = sub['id']
+            await self.delete_subscription(session, subscription_id)
+
+    async def update_subscription(self, session, subscription_id, subscription_data):
+        """
+        Updates an existing subscription with new data.
+
+        Args:
+            session (aiohttp.ClientSession): The HTTP session to use for the request.
+            subscription_id (str): The ID of the subscription to update.
+            subscription_data (dict): The new subscription data.
+
+        Returns:
+            bool: True if the subscription was updated successfully; False otherwise.
+        """
+        try:
+            async with session.patch(
+                f"{self.broker_url}/ngsi-ld/v1/subscriptions/{subscription_id}",
+                headers={"Content-Type": "application/merge-patch+json"},
+                json=subscription_data
+            ) as response:
+                if response.status == 204:
+                    logger.info(f"Subscription {subscription_id} updated successfully")
+                    return True
                 else:
-                    logger.error(f"Failed to delete subscription {subscription_id}.")
-            else:
-                logger.warning("Invalid subscription number.")
-        except ValueError:
-            logger.warning("Invalid input. Please enter a number or 'q'.")
+                    logger.error(f"Failed to update subscription {subscription_id}: {await response.text()}")
+                    return False
+        except aiohttp.ClientError as e:
+            logger.error(f"Client error occurred while updating subscription: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error occurred: {str(e)}")
+            return False
 
     async def run(self):
         try:
@@ -228,46 +279,9 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.info(f"Local IP: {local_ip}")
 
             async with aiohttp.ClientSession() as session:
-                subscription_data = {
-                    "type": "Subscription",
-                    "entities": [{"type": self.config.get("entity_type")}],
-                    "notification": {
-                        "endpoint": {
-                            "uri": f"http://{local_ip}:9999/notify",
-                            "accept": "application/json"
-                        }
-                    },
-                    "@context": self.config.get("context", [
-                        "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
-                    ])
-                }
+                subscription_data = self.build_subscription_data(local_ip)
 
-                entity_id = self.config.get("entity_id", "").strip()
-                if entity_id:
-                    formatted_entity_id = self.format_entity_id(self.config.get("entity_type"), entity_id)
-                    subscription_data["entities"][0]["id"] = formatted_entity_id
-                    logger.info(f"Formatted entity ID: {formatted_entity_id}")
-
-                watched_attributes = self.config.get("watched_attributes", [])
-                if watched_attributes:
-                    subscription_data["watchedAttributes"] = watched_attributes
-                    subscription_data["notification"]["attributes"] = watched_attributes
-                    self.watched_attributes = watched_attributes
-                else:
-                    self.watched_attributes = []
-
-
-                q_filter = self.config.get("q_filter", "").strip()
-                if q_filter:
-                    subscription_data["q"] = q_filter
-
-                logger.info("Subscription data:")
-                logger.info(json.dumps(subscription_data, indent=2))
-
-                subscription_id = await self.create_subscription(session, subscription_data)
-                if subscription_id:
-                    logger.info(f"Subscription ID: {subscription_id}")
-
+                # Iniciar el servidor de notificaciones antes de crear suscripciones
                 app = web.Application()
                 app.router.add_post("/notify", self.handle_notification)
                 runner = web.AppRunner(app)
@@ -276,12 +290,76 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                 await site.start()
 
                 logger.info(f"Notification server is running on http://{local_ip}:9999")
-                logger.info("Press Ctrl+C to exit")
+
+                if self.config.get("delete_all_subscriptions", False):
+                    await self.delete_all_subscriptions(session)
+
+                similar_subscriptions = await self.find_similar_subscriptions(session, subscription_data)
+
+                if self.config.get("delete_similar_subscriptions", False):
+                    await self.delete_similar_subscriptions(session, similar_subscriptions)
+                elif self.config.get("update_existing_subscription", False) and similar_subscriptions:
+                    subscription_id = similar_subscriptions[0]['id']
+                    await self.update_subscription(session, subscription_id, subscription_data)
+                    logger.info(f"Subscription {subscription_id} has been updated.")
+                else:
+                    subscription_id = await self.create_subscription(session, subscription_data)
+                    if subscription_id:
+                        logger.info(f"Subscription ID: {subscription_id}")
+
+                logger.info("Agent is running. Press Ctrl+C to exit.")
 
                 while True:
                     await asyncio.sleep(1)
         except Exception as e:
             logger.error(f"An error occurred while running the artifact: {str(e)}")
+
+    def build_subscription_data(self, local_ip):
+        """
+        Builds the subscription data based on the configuration.
+
+        Args:
+            local_ip (str): The local IP address to use in the notification endpoint.
+
+        Returns:
+            dict: The subscription data.
+        """
+        subscription_data = {
+            "type": "Subscription",
+            "entities": [{"type": self.config.get("entity_type")}],
+            "notification": {
+                "endpoint": {
+                    "uri": f"http://{local_ip}:9999/notify",
+                    "accept": "application/json"
+                }
+            },
+            "@context": self.config.get("context", [
+                "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
+            ])
+        }
+
+        entity_id = self.config.get("entity_id", "").strip()
+        if entity_id:
+            formatted_entity_id = self.format_entity_id(self.config.get("entity_type"), entity_id)
+            subscription_data["entities"][0]["id"] = formatted_entity_id
+            logger.info(f"Formatted entity ID: {formatted_entity_id}")
+
+        watched_attributes = self.config.get("watched_attributes", [])
+        if watched_attributes:
+            subscription_data["watchedAttributes"] = watched_attributes
+            subscription_data["notification"]["attributes"] = watched_attributes
+            self.watched_attributes = watched_attributes
+        else:
+            self.watched_attributes = []
+
+        q_filter = self.config.get("q_filter", "").strip()
+        if q_filter:
+            subscription_data["q"] = q_filter
+
+        logger.info("Subscription data:")
+        logger.info(json.dumps(subscription_data, indent=2))
+
+        return subscription_data
 
     def get_local_ip(self):
         """
