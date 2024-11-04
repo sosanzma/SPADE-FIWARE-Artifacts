@@ -69,7 +69,7 @@ async def main():
         broker_url=broker_url
     )
 
-    agent_jid = f"agent_notification@{XMPP_SERVER}"
+    agent_jid = f"agent_notified@{XMPP_SERVER}"
     agent_passwd  = getpass(prompt="Password for agent who receives the notification> ")
 
     try:

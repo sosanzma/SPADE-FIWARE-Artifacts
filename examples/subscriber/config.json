@@ -1,5 +1,5 @@
 {
-    "XMPP_SERVER": "158.42.153.235",
-    "subscriber_artifact_name": "subscriber",
+    "XMPP_SERVER": "sosanzma.home",
+    "subscriber_artifact_name": "art_subscriber",
     "broker_port": "http://localhost:9090"
 }

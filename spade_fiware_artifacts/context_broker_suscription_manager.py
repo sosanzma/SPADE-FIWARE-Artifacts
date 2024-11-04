@@ -238,6 +238,8 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                     if subscription_id:
                         self.active_subscriptions[subscription_identifier] = subscription_id
                         logger.info(f"Created subscription {subscription_identifier} ({subscription_id})")
+                        logger.info(json.dumps(subscription_data, indent=2))
+
                     return subscription_id
                 else:
                     logger.error(f"Failed to create subscription: {await response.text()}")
@@ -352,7 +354,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                     "accept": "application/json"
                 }
             },
-            "description": f"Artefact-ID: {self.jid}, Sub-ID: {subscription_identifier}",
+            #"description": f"Artefact-ID: {self.jid}, Sub-ID: {subscription_identifier}",
             "@context": self.config.get("context", [
                 "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
             ])
@@ -364,7 +366,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             subscription_data["entities"][0]["id"] = formatted_entity_id
 
         watched_attributes = self.config.get("watched_attributes", [])
-        if watched_attributes:
+        if len(watched_attributes) > 0:
             subscription_data["watchedAttributes"] = watched_attributes
             subscription_data["notification"]["attributes"] = watched_attributes
             self.watched_attributes = watched_attributes

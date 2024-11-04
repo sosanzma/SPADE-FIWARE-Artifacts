@@ -1,12 +1,13 @@
 {
     "entity_type": "WasteContainer",
     "entity_id": "088",
-    "watched_attributes": ["fillingLevel", "temperature"],
-    "q_filter": "fillingLevel>0.7",
+    "watched_attributes": [],
+    "q_filter": "",
     "context": [
         "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
     ],
-    "delete_all_subscriptions": true,
-    "delete_similar_subscriptions": false,
-    "update_existing_subscription": false
+    "delete_all_artefact_subscriptions": false,
+    "delete_subscription_identifier": "subs_v1_1",
+    "subscription_identifier": "subs_v1_1",
+    "delete_only": false
 }
