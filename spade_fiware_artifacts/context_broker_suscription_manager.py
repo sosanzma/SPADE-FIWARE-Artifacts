@@ -249,12 +249,27 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return None
 
     async def handle_notification(self, request):
+        """
+        Handles incoming notifications by parsing the request data,
+        filtering the relevant attributes, logging the information,
+        updating recent notifications, and publishing the data.
+
+        Args:
+            request (web.Request): The incoming HTTP request containing the notification data.
+
+        Returns:
+            web.Response: A response indicating whether the notification was successfully processed or if an error occurred.
+
+        Raises:
+            json.JSONDecodeError: If the notification data cannot be decoded as JSON.
+            Exception: For any unexpected errors during notification handling.
+            """
         try:
             data = await request.json()
             logger.info("Received notification")
 
             filtered_data = data.copy()
-            # Solo filtrar si hay watched_attributes específicos
+
             if self.watched_attributes:
                 for entity in filtered_data.get('data', []):
                     filtered_entity = {
