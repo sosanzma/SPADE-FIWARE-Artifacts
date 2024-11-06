@@ -199,7 +199,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.error(f"Error deleting subscription {subscription_identifier}: {str(e)}")
             return False
 
-    async def delete_artifact_subscriptions(self, session):
+    async def  delete_artifact_subscriptions(self, session):
         """
         Deletes all active subscriptions of the current artifact.
 
@@ -249,27 +249,20 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             return None
 
     async def handle_notification(self, request):
-        """
-        Handles incoming notifications from the Context Broker.
-
-        Args:
-            request (aiohttp.web.Request): The incoming HTTP request containing the notification.
-
-        Returns:
-            aiohttp.web.Response: A response indicating the result of processing the notification.
-        """
         try:
             data = await request.json()
             logger.info("Received notification")
 
             filtered_data = data.copy()
-            for entity in filtered_data.get('data', []):
-                filtered_entity = {
-                    k: v for k, v in entity.items()
-                    if k in self.watched_attributes or k in ['id', 'type']
-                }
-                entity.clear()
-                entity.update(filtered_entity)
+            # Solo filtrar si hay watched_attributes específicos
+            if self.watched_attributes:
+                for entity in filtered_data.get('data', []):
+                    filtered_entity = {
+                        k: v for k, v in entity.items()
+                        if k in self.watched_attributes or k in ['id', 'type']
+                    }
+                    entity.clear()
+                    entity.update(filtered_entity)
 
             logger.info(json.dumps(filtered_data, indent=2))
 
@@ -282,6 +275,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                 }
 
             await self.publish(str(data))
+
 
             return web.Response(text="Notification received and processed")
         except json.JSONDecodeError as e:
@@ -302,13 +296,12 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             logger.info(f"Artifact {self.jid} using port {self.port}")
 
             async with aiohttp.ClientSession() as session:
-                if self.config.get("delete_all_artefact_subscriptions", False):
+                if self.config.get("delete_all_artifact_subscriptions", False):
                     await self.delete_artifact_subscriptions(session)
                 elif self.config.get("delete_subscription_identifier"):
                     await self.delete_subscription_by_identifier(
                         session,
-                        self.config["delete_subscription_identifier"]
-                    )
+                        self.config["delete_subscription_identifier"])
 
                 if not self.config.get("delete_only", False):
                     subscription_identifier = self.config.get("subscription_identifier",
@@ -354,7 +347,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
                     "accept": "application/json"
                 }
             },
-            #"description": f"Artefact-ID: {self.jid}, Sub-ID: {subscription_identifier}",
+            "description": f"Artifact-ID: {self.jid}, Sub-ID: {subscription_identifier}",
             "@context": self.config.get("context", [
                 "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
             ])
@@ -366,7 +359,7 @@ class SubscriptionManagerArtifact(spade_artifact.Artifact):
             subscription_data["entities"][0]["id"] = formatted_entity_id
 
         watched_attributes = self.config.get("watched_attributes", [])
-        if len(watched_attributes) > 0:
+        if watched_attributes and len(watched_attributes) > 0:
             subscription_data["watchedAttributes"] = watched_attributes
             subscription_data["notification"]["attributes"] = watched_attributes
             self.watched_attributes = watched_attributes
