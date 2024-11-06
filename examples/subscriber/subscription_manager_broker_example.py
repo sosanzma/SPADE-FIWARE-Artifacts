@@ -29,7 +29,6 @@ async def main():
     """
     Función principal que inicia el artefacto y el agente.
     """
-    # Cargar la configuración general
     try:
         with open('config.json', 'r') as config_file:
             config = json.load(config_file)
