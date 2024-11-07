@@ -16,10 +16,11 @@ SPADE-FIWARE-Artifacts
 
 **SPADE-FIWARE-Artifacts** is a toolkit designed to integrate SPADE (Smart Python Agent Development Environment) with FIWARE. It enables SPADE-based multi-agent systems to interact with FIWARE's context management system, supporting both Orion and Scorpio Context Brokers. The main goal is to facilitate seamless communication and data sharing between these systems.
 
-Features
---------
+Artifacts
+-----------
 
-### InserterArtifact
+Inserter Artifact
+-------------------------
 
 The `InserterArtifact` class allows structured communication with FIWARE's Context Brokers, providing the following functionalities:
 
@@ -49,7 +50,8 @@ The `InserterArtifact` class allows structured communication with FIWARE's Conte
 
    - Comprehensive error handling with detailed logging, powered by `loguru`.
 
-### SubscriptionManagerArtifact
+Subscription Manager Artifact
+-------------------------
 
 The `SubscriptionManagerArtifact` class manages subscriptions to a FIWARE Context Broker and handles notifications with these key features:
 
