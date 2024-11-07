@@ -13,267 +13,95 @@ SPADE-FIWARE-Artifacts
     :target: https://coveralls.io/github/sosanzma/SPADE-FIWARE-Artifacts?branch=main
 
 
-SPADE-FIWARE-Artifacts is a powerful toolkit that bridges the gap between SPADE (Smart Python Agent Development Environment) and FIWARE, specifically focusing on interaction with the Orion and Scorpio Context Brokers. This project provides a set of artifacts that enable SPADE-based multi-agent systems to seamlessly interact with FIWARE's context management capabilities.
+
+**SPADE-FIWARE-Artifacts** is a toolkit designed to integrate SPADE (Smart Python Agent Development Environment) with FIWARE. It enables SPADE-based multi-agent systems to interact with FIWARE's context management system, supporting both Orion and Scorpio Context Brokers. The main goal is to facilitate seamless communication and data sharing between these systems.
 
 Features
 --------
 
-InserterArtifact
-^^^^^^^^^^^^^^^^
+### InserterArtifact
 
-The core of this toolkit is the ``InserterArtifact`` class, which facilitates sophisticated communication with FIWARE Context Brokers. Key features include:
+The `InserterArtifact` class allows structured communication with FIWARE's Context Brokers, providing the following functionalities:
 
-1. **Flexible Data Processing**: 
-   
-   - Customizable data processor function allows for tailored data transformation before insertion.
-   - The data processor must output a JSON format that respects the expected payload structure.
-   - Default processor provided, but can be easily overridden for specific use cases.
-   - This flexibility allows integration with various data sources, including APIs, databases, and more.
+1. **Flexible Data Processing**
 
-2. **Entity Management**:
-   
-   - **Intelligent Entity Handling**: The artifact checks if an entity exists before deciding to create or update.
-   - **Create New Entities**: If an entity doesn't exist, it's created with all provided attributes.
-   - **Update Existing Entities**: For existing entities, the artifact can:
-     
-     - Update specific attributes
-     - Update all attributes
-   - **Attribute Addition**: If an update includes a new attribute not present in the existing entity, it's automatically added.
+   - Customizable data processor function for transforming data before insertion, outputting data in JSON format to meet payload requirements.
+   - Supports multiple data sources, including APIs and databases.
 
-3. **NGSI-LD Support**: 
-   
-   - Full support for NGSI-LD format, ensuring compatibility with modern FIWARE deployments.
-   - Handles different types of attributes: Properties, GeoProperties, and Relationships.
+2. **Entity Management**
 
-4. **Asynchronous Operations**: 
-   
-   - Utilizes ``asyncio`` for non-blocking operations, allowing efficient handling of multiple requests.
+   - **Intelligent Entity Handling**: Checks if an entity exists and either creates or updates it accordingly.
+   - Supports both partial and complete updates for existing entities, with automatic addition of new attributes.
 
-5. **Configurable JSON Templates**: 
-   
-   - Uses customizable JSON templates for structuring data, providing flexibility in entity representation.
+3. **NGSI-LD Support**
 
-6. **Robust Error Handling and Logging**: 
-   
-   - Comprehensive error handling and detailed logging using the ``loguru`` library.
+   - Fully supports NGSI-LD, managing various attribute types (Properties, GeoProperties, and Relationships) for compatibility with FIWARE.
 
-PublisherArtifact
-^^^^^^^^^^^^^^^^^
+4. **Asynchronous Operations**
 
-The ``PublisherArtifact`` class provided in the example is a simple demonstration of how data can be fed into the system. However, it's important to note:
+   - Utilizes `asyncio` for non-blocking operations, improving performance when managing multiple requests.
 
-- This is just a basic example and not limited to the functionality shown.
-- In real-world scenarios, this could be replaced or extended to integrate with any external data source.
-- The true power of the system lies in its ability to work with diverse data sources, such as APIs, databases, IoT devices, or any other data stream.
+5. **Configurable JSON Templates**
+
+   - Allows customized JSON templates for data structuring and flexible formatting.
+
+6. **Error Handling and Logging**
+
+   - Comprehensive error handling with detailed logging, powered by `loguru`.
+
+### SubscriptionManagerArtifact
+
+The `SubscriptionManagerArtifact` class manages subscriptions to a FIWARE Context Broker and handles notifications with these key features:
+
+1. **Subscription Management**
+
+   - Capable of retrieving, creating, deleting, and managing subscriptions with the Context Broker.
+
+2. **Notification Handling**
+
+   - Processes incoming notifications, updates recent notifications, and provides comprehensive logging.
+
+3. **Port and IP Handling**
+
+   - Retrieves the local IP and finds an available port for establishing communication endpoints.
 
 How It Works
 ------------
 
-1. **Configuration**: 
-   
-   - The system uses separate configuration files (``config.json``, ``json_template.json``, ``payload.json``) for easy customization.
+1. **Configuration**
 
-2. **Data Flow**:
-   
-   - Data is ingested from an external source (API, database, IoT devices, etc.)
-   - The data processor transforms this data into the required JSON format, matching the expected payload structure.
-   - ``InserterArtifact`` receives this processed JSON data and sends it to the FIWARE Context Broker.
+   - Utilizes configuration files (e.g., `config.json`, `json_template.json`, `payload.json`) for setup and customization.
 
-3. **Entity Handling Process**:
-   
-   - The artifact checks if the entity exists in the Context Broker.
-   - If it exists:
-     
-     - Updates are applied to the existing entity.
-     - New attributes are added if they don't already exist.
-   - If it doesn't exist:
-     
-     - A new entity is created with all provided attributes.
+2. **Data Flow**
 
-4. **XMPP Communication**: 
-   
-   - Utilizes SPADE's artifact system for communication between data source and inserter.
+   - Data is fetched from an external source (API, database, IoT device), processed, and sent to FIWARE's Context Broker by the `InserterArtifact`.
 
-Installation
-------------
+3. **Entity Handling**
 
-.. code-block:: bash
+   - If an entity already exists, it is updated with new attributes or specific attribute updates. If not, a new entity is created.
 
-   pip install spade_fiware_artifacts
+4. **XMPP Communication**
 
-Quick Start
------------
+   - SPADE’s artifact system is used for data exchange between the data source and the inserter.
 
-Using InserterArtifact
-^^^^^^^^^^^^^^^^^^^^^^
+5. **Subscription Notifications**
 
-.. code-block:: python
-
-   from spade_fiware_artifacts import InserterArtifact
-
-   inserter = InserterArtifact(
-       jid="inserter@example.com",
-       password="password",
-       publisher_jid="data_source@example.com",
-       host="contextbroker.example.com",
-       project_name="my_project"
-   )
-
-   await inserter.start()
-
-Configuration
-^^^^^^^^^^^^^
-
-Customize the behavior by modifying:
-
-- ``config.json``: General configuration settings
-- ``json_template.json``: Template for entity structure
-- ``payload.json``: Example of data structure (in real scenarios, this would come from your data source)
-
-Advanced Usage
---------------
-
-Custom Data Processor
-^^^^^^^^^^^^^^^^^^^^^
-
-The data processor is where the magic happens. You can define a custom data processor to transform data from your specific source into the JSON format expected by the Context Broker:
-
-.. code-block:: python
-
-   def custom_processor(data):
-       # Your custom logic here
-       # This could involve complex transformations, data cleaning, etc.
-       # The output MUST be a JSON that matches the expected payload structure
-       processed_data = {
-           "id": data["some_id"],
-           "type": "YourEntityType",
-           "attribute1": {
-               "type": "Property",
-               "value": data["some_value"]
-           },
-           # ... other attributes ...
-       }
-       return processed_data
-
-   inserter = InserterArtifact(
-       # ... other parameters ...
-       data_processor=custom_processor
-   )
-
-Specific Attribute Updates
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To update only specific attributes:
-
-.. code-block:: python
-
-   inserter = InserterArtifact(
-       # ... other parameters ...
-       columns_update=['attribute1', 'attribute2']
-   )
-
-Integrating with Different Data Sources
----------------------------------------
-
-The toolkit's flexibility allows for integration with various data sources. Here are a few examples:
-
-1. **API Integration**:
-
-   .. code-block:: python
-
-      import requests
-      import json
-
-      def api_data_processor(data):
-          response = requests.get('https://api.example.com/data')
-          api_data = response.json()
-          # Transform api_data to match expected payload format
-          transformed_data = {
-              "id": f"urn:ngsi-ld:YourEntity:{api_data['id']}",
-              "type": "YourEntityType",
-              "attribute1": {
-                  "type": "Property",
-                  "value": api_data["some_value"]
-              },
-              # ... other attributes ...
-          }
-          return json.dumps(transformed_data)  # Ensure output is JSON string
-
-      inserter = InserterArtifact(data_processor=api_data_processor, ...)
-
-2. **Database Integration**:
-
-   .. code-block:: python
-
-      import sqlite3
-      import json
-
-      def db_data_processor(data):
-          conn = sqlite3.connect('your_database.db')
-          cursor = conn.cursor()
-          cursor.execute('SELECT * FROM your_table')
-          db_data = cursor.fetchall()
-          # Transform db_data to match expected payload format
-          transformed_data = {
-              "id": f"urn:ngsi-ld:YourEntity:{db_data[0][0]}",
-              "type": "YourEntityType",
-              "attribute1": {
-                  "type": "Property",
-                  "value": db_data[0][1]
-              },
-              # ... other attributes ...
-          }
-          return json.dumps(transformed_data)  # Ensure output is JSON string
-
-      inserter = InserterArtifact(data_processor=db_data_processor, ...)
-
-3. **IoT Device Integration**:
-
-   .. code-block:: python
-
-      import paho.mqtt.client as mqtt
-      import json
-
-      def on_message(client, userdata, message):
-          # This function will be called when a message is received
-          payload = message.payload.decode()
-          # Process the payload and transform it to match expected format
-          transformed_data = {
-              "id": f"urn:ngsi-ld:IoTDevice:{payload['device_id']}",
-              "type": "IoTDevice",
-              "temperature": {
-                  "type": "Property",
-                  "value": payload["temp"]
-              },
-              # ... other attributes ...
-          }
-          return json.dumps(transformed_data)  # Ensure output is JSON string
-
-      def iot_data_processor(data):
-          client = mqtt.Client()
-          client.on_message = on_message
-          client.connect("mqtt.example.com", 1883)
-          client.loop_start()
-          # ... logic to subscribe to topics, etc.
-
-      inserter = InserterArtifact(data_processor=iot_data_processor, ...)
-
-These examples demonstrate how to process data from different sources and ensure that the output is a JSON string that matches the expected payload format. Remember to always use ``json.dumps()`` to convert your processed data into a JSON string before returning it from your data processor.
+   - The `SubscriptionManagerArtifact` receives and manages notifications based on active subscriptions.
 
 Compatibility
 -------------
 
-These artifacts are compatible with both Orion and Scorpio Context Brokers, allowing you to work with either implementation of the NGSI-LD API.
+This toolkit is compatible with both Orion and Scorpio Context Brokers, supporting interaction with NGSI-LD API implementations.
 
 Documentation
 -------------
 
-For detailed documentation, please visit our `ReadTheDocs documentation <https://spade-fiware-artifacts.readthedocs.io/en/latest/>`_.
+For detailed documentation, please visit the `ReadTheDocs <https://spade-fiware-artifacts.readthedocs.io/en/latest/>`_.
 
 Contributing
 ------------
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Feel free to submit a Pull Request.
 
 License
 -------
