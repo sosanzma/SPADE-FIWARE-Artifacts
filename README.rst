@@ -77,7 +77,14 @@ Example usage::
     subscription_manager = SubscriptionManagerArtifact(
         jid="subscriber@xmpp.server",
         passwd="password",
-        config={
+        config= config_payload,
+        broker_url="http://broker.example.com:9090"
+    )
+
+
+where ::
+
+    config_payload =  {
             "entity_type": "WasteContainer",
             "entity_id": "088",
             "watched_attributes": [],
@@ -89,10 +96,7 @@ Example usage::
             "delete_subscription_identifier": "subs_1",
             "subscription_identifier": "subs_2",
             "delete_only": false
-        },
-        broker_url="http://broker.example.com:9090"
-    )
-
+        }
 Installation
 -----------
 
