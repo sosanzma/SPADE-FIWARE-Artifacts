@@ -15,7 +15,7 @@ SPADE-FIWARE-Artifacts
 Overview
 --------
 
-SPADE-FIWARE-Artifacts is a Python library that bridges SPADE (Smart Python Agent Development Environment) with FIWARE Context Brokers. It provides a robust toolkit for multi-agent systems to interact with FIWARE's context management system, supporting both Orion and Scorpio Context Brokers through NGSI-LD.
+SPADE-FIWARE-Artifacts is a Python library that bridges SPADE (Smart Python Agent Development Environment) with FIWARE Context Brokers. It provides a  toolkit for multi-agent systems to interact with FIWARE's context management system, supporting both Orion and Scorpio Context Brokers through NGSI-LD.
 
 Key Features
 -----------
