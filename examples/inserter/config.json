@@ -1,7 +1,7 @@
 {
-    "XMPP_SERVER": "sosanzma.home",
-    "publisher_artifact_name": "publisher_artifact",
-    "subscriber_artifact_name": "subscriber_artifact",
-    "host": "localhost",
-    "project_name": "ngb"
+    "XMPP_SERVER": "URL_of_the_XMPP_server",
+    "publisher_artifact_name": "name_of_the_publisher_artifact",
+    "subscriber_artifact_name": "name_of_the_subscriber_artifact",
+    "host": "host_name_or_IP_address",
+    "project_name": "name_of_the_project"
 }

@@ -1,13 +1,14 @@
 {
-    "entity_type": "WasteContainer",
-    "entity_id": "088",
-    "watched_attributes": [],
-    "q_filter": "",
+    "entity_type": "type_of_the_entity (e.g., WasteContainer)",
+    "entity_id": "unique_identifier_of_the_entity (e.g., 088)",
+    "watched_attributes": "list_of_attributes_to_watch (e.g., ['fillingLevel', 'temperature'])",
+    "q_filter": "filter_query_for_attributes (e.g., fillingLevel>0.7)",
     "context": [
-        "https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld"
+        "URL_of_the_context_JSON-LD (e.g., https://raw.githubusercontent.com/smart-data-models/dataModel.WasteManagement/master/context.jsonld)"
     ],
-    "delete_all_artefact_subscriptions": false,
-    "delete_subscription_identifier": "subs_v1_1",
-    "subscription_identifier": "subs_v1_1",
-    "delete_only": false
+    "delete_all_artefact_subscriptions": "true_or_false_to_delete_all_subscriptions (e.g., true)",
+    "delete_subscription_identifier": "identifier_of_the_subscription_to_delete (e.g., subs_v1_1)",
+    "subscription_identifier": "identifier_of_the_subscription (e.g., subs_v1_1)",
+    "delete_only": "true_or_false_to_specify_if_only_deletion_is_required (e.g., false)"
 }
+
