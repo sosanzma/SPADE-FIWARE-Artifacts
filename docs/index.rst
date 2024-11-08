@@ -22,7 +22,7 @@ Table of Contents
 -----------------
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Getting Started
 
    introduction
@@ -30,14 +30,14 @@ Table of Contents
    quickstart
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Artifacts
 
     inserter_artifact
     manager_subs_artifacts
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 0
    :caption: User Guide
 
 
