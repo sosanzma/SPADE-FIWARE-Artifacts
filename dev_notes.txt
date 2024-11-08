@@ -1,0 +1,9 @@
+
+
+
+
+Cuando no filtro por watched attributes, la notificacion no me informa de nada, simplemente sale la notificacion,
+pero en la variable data , no hay informacion a cerca del valor de las variables que ha cambiado.
+Esto antes no me pasaba, deberia intentar ejecutar el codigo tal y como esta en la rama main y ver si funciona.
+Tambien podria hacerlo desde la terminal  de ubuntu mediante http
+
