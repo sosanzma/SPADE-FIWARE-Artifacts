@@ -1,5 +1,4 @@
-spade
-aiohttp
-loguru
-asyncio
-spade_artifact
+spade_artifact==0.2.1
+asyncio==3.4.3
+aiohttp==3.9.2
+loguru==0.7.2
