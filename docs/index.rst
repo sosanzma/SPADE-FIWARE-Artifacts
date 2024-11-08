@@ -31,6 +31,13 @@ Table of Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: Artifacts
+
+    inserter_artifact
+    manager_subs_artifacts
+
+.. toctree::
+   :maxdepth: 2
    :caption: User Guide
 
 
@@ -38,7 +45,7 @@ Table of Contents
    example_inserter
    example_subs_manager
    spade
-   future_work
+
 
 
 
