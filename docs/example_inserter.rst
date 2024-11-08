@@ -1,4 +1,4 @@
-Use Case Guide :  `insterter_context_broker` Example
+Use Case Example Guide :  `Insterter_context_broker`
 ===============================================
 
 Introduction

@@ -1,4 +1,4 @@
-Use Case Guide: `InserterArtifact`
+`InserterArtifact`
 =================================
 
 Introduction

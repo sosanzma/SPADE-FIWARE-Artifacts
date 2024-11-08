@@ -1,4 +1,4 @@
-Use Case Guide: `SubscriptionManagerArtifact` Example
+Use Case Example Guide: `SubscriptionManagerArtifact`
 ==================================================
 
 Introduction

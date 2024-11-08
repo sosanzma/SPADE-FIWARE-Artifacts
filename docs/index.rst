@@ -29,15 +29,16 @@ Table of Contents
    installation
    quickstart
 
+
 .. toctree::
    :maxdepth: 1
    :caption: Artifacts
 
-    inserter_artifact
-    manager_subs_artifacts
+   inserter_artifact
+   manager_subs_artifacts
 
 .. toctree::
-   :maxdepth: 0
+   :maxdepth: 1
    :caption: User Guide
 
 
@@ -45,8 +46,6 @@ Table of Contents
    example_inserter
    example_subs_manager
    spade
-
-
 
 
 .. toctree::

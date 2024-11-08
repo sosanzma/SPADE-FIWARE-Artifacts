@@ -1,5 +1,5 @@
-Technical Documentation: SubscriptionManagerArtifact Class
-=======================================================
+`SubscriptionManagerArtifact`
+===============================
 
 Overview
 --------
