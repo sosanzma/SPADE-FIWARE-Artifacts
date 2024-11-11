@@ -19,7 +19,6 @@ setup(
         "spade_artifact==0.2.1",
         "asyncio==3.4.3",
         "aiohttp==3.9.2",
-        "loguru==0.7.2",
     ],
     include_package_data=True,
     classifiers=[
