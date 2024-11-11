@@ -17,8 +17,7 @@ setup(
     install_requires=[
 
         "spade_artifact==0.2.1",
-        "asyncio==3.4.3",
-        "aiohttp==3.9.2",
+        "asyncio==3.4.3"
     ],
     include_package_data=True,
     classifiers=[
