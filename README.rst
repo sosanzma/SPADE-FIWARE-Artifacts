@@ -35,7 +35,7 @@ This artifacts are the following:
 InserterArtifact
 ~~~~~~~~~~~~~~~
 
-A powerful component for managing entity data in FIWARE Context Brokers:
+A  component for managing entity data in FIWARE Context Brokers:
 
 - **Entity Management**:
     - Create new entities with complex attributes
