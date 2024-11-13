@@ -209,4 +209,3 @@ Additional Notes
 
 
 
-This example serves as a starting point for implementing subscription-based monitoring in FIWARE using SPADE agents and artifacts.

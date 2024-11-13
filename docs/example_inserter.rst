@@ -248,7 +248,3 @@ Troubleshooting
 - Verify that the provided JIDs and passwords are correct.
 - If entities are not being created/updated, check the Context Broker logs for any errors.
 
-Conclusion
-----------
-
-This example demonstrates how to use SPADE-FIWARE-Artifacts to publish data to a FIWARE Context Broker. By understanding and customizing this example, you can adapt it to your specific use case, whether it's integrating with different data sources, modifying the entity structure, or adjusting the data processing logic.

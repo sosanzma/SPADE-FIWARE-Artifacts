@@ -267,7 +267,3 @@ Common Issues
    - Verify attribute names and types
    - Check NGSI-LD compatibility
 
-Conclusion
----------
-
-The ``InserterArtifact`` provides a flexible solution for managing data in FIWARE Context Brokers. Its versatility makes it suitable for various use cases, from IoT applications to smart city implementations.

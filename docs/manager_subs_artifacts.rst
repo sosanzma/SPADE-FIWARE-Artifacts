@@ -269,6 +269,3 @@ Integration Examples
             # Custom processing
             await self.publish(processed_data)
 
-Conclusion
----------
-The ``SubscriptionManagerArtifact`` provides a robust foundation for managing NGSI-LD subscriptions in a FIWARE environment. Its modular design, comprehensive feature set, and flexible configuration options make it suitable for a wide range of application scenarios.
