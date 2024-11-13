@@ -1,5 +1,9 @@
 import pytest
 import json
+from unittest.mock import patch, AsyncMock
+import pytest
+import aiohttp
+from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from spade_fiware_artifacts.context_broker_suscription_manager import SubscriptionManagerArtifact
 
@@ -168,10 +172,71 @@ class TestNotificationHandling:
         assert response.status == 400
 
 
-from unittest.mock import patch, AsyncMock
-import pytest
-import aiohttp
-from contextlib import asynccontextmanager
+    @pytest.mark.asyncio
+    async def test_handle_notification_empty_data(self, subscription_manager):
+        """Test notification handling with empty data array"""
+        subscription_manager.publish = AsyncMock()
+
+        notification_data = {
+            "notifiedAt": "2024-01-01T12:00:00Z",
+            "data": []
+        }
+
+        request = MagicMock()
+        request.json = AsyncMock(return_value=notification_data)
+
+        response = await subscription_manager.handle_notification(request)
+        assert response.status == 500, "Should handle empty data array appropriately"
+
+
+
+    @pytest.mark.asyncio
+    async def test_handle_notification_empty_data(self, subscription_manager):
+        """Test notification handling with empty data array"""
+        subscription_manager.publish = AsyncMock()
+
+        notification_data = {
+            "notifiedAt": "2024-01-01T12:00:00Z",
+            "data": []
+        }
+
+        request = MagicMock()
+        request.json = AsyncMock(return_value=notification_data)
+
+        response = await subscription_manager.handle_notification(request)
+        assert response.status == 500, "Should handle empty data array appropriately"
+
+
+class TestSubscriptionConfiguration:
+    def test_build_subscription_data_with_q_filter(self, subscription_manager):
+        """Test building subscription data with q filter"""
+        subscription_manager.config["q_filter"] = "temperature>20"
+        local_ip = "192.168.1.1"
+        sub_id = "test_sub_001"
+
+        subscription_data = subscription_manager.build_subscription_data(local_ip, sub_id)
+        assert "q" in subscription_data, "Q filter should be included in subscription data"
+        assert subscription_data["q"] == "temperature>20", "Q filter value incorrect"
+
+    def test_build_subscription_data_empty_watched_attributes(self, subscription_manager):
+        """Test building subscription data with empty watched attributes"""
+        subscription_manager.config["watched_attributes"] = []
+        local_ip = "192.168.1.1"
+        sub_id = "test_sub_001"
+
+        subscription_data = subscription_manager.build_subscription_data(local_ip, sub_id)
+        assert "watchedAttributes" not in subscription_data, "Should not include empty watched attributes"
+        assert "attributes" not in subscription_data["notification"], "Should not include empty notification attributes"
+
+    def test_format_entity_id_empty_input(self, subscription_manager):
+        """Test entity ID formatting with empty input"""
+        entity_id = subscription_manager.format_entity_id("Device", "")
+        assert entity_id == "", "Should handle empty entity ID correctly"
+
+    def test_format_entity_id_special_characters(self, subscription_manager):
+        """Test entity ID formatting with special characters"""
+        entity_id = subscription_manager.format_entity_id("Device", "test/001#special")
+        assert entity_id == "urn:ngsi-ld:Device:test/001#special", "Should handle special characters in entity ID"
 
 
 class TestSubscriptionManagement:
@@ -209,6 +274,86 @@ class TestSubscriptionManagement:
         url, kwargs = mock_session.get_calls[0]
         assert url == f"{subscription_manager.broker_url}/ngsi-ld/v1/subscriptions"
         assert kwargs["headers"]["Accept"] == "application/ld+json"
+
+    @pytest.mark.asyncio
+    async def test_find_artifact_subscriptions_empty_response(self, subscription_manager):
+        """Test finding subscriptions when response is empty"""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=[])
+
+        class MockSession:
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                yield mock_response
+
+        mock_session = MockSession()
+        result = await subscription_manager.find_artifact_subscriptions(mock_session)
+        assert result == {}, "Should return empty dict when no subscriptions found"
+
+    @pytest.mark.asyncio
+    async def test_find_artifact_subscriptions_network_error(self, subscription_manager):
+        """Test finding subscriptions when network error occurs"""
+
+        class MockSession:
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                raise aiohttp.ClientError("Network error")
+
+        mock_session = MockSession()
+        result = await subscription_manager.find_artifact_subscriptions(mock_session)
+        assert result == {}, "Should return empty dict on network error"
+
+    @pytest.mark.asyncio
+    async def test_delete_subscription_network_error(self, subscription_manager):
+        """Test deletion when network error occurs"""
+
+        class MockSession:
+            @asynccontextmanager
+            async def delete(self, url, **kwargs):
+                raise aiohttp.ClientError("Network error")
+
+        mock_session = MockSession()
+        result = await subscription_manager.delete_subscription(mock_session, "test_sub_id")
+        assert result is False, "Should return False on network error"
+
+    @pytest.mark.asyncio
+    async def test_delete_subscription_not_found(self, subscription_manager):
+        """Test deletion when subscription doesn't exist"""
+        mock_response = AsyncMock()
+        mock_response.status = 404
+        mock_response.text = AsyncMock(return_value="Subscription not found")
+
+        class MockSession:
+            @asynccontextmanager
+            async def delete(self, url, **kwargs):
+                yield mock_response
+
+        mock_session = MockSession()
+        result = await subscription_manager.delete_subscription(mock_session, "non_existent_sub")
+        assert result is False, "Should return False when subscription not found"
+
+    @pytest.mark.asyncio
+    async def test_create_subscription_invalid_data(self, subscription_manager):
+        """Test subscription creation with invalid data"""
+        mock_response = AsyncMock()
+        mock_response.status = 400
+        mock_response.text = AsyncMock(return_value="Invalid subscription data")
+
+        class MockSession:
+            @asynccontextmanager
+            async def post(self, url, **kwargs):
+                yield mock_response
+
+        mock_session = MockSession()
+        result = await subscription_manager.create_subscription(
+            mock_session,
+            {"invalid": "data"},
+            "test_sub_001"
+        )
+        assert result is None, "Should return None when subscription data is invalid"
+
+
 class TestNetworkUtilities:
     """Test network-related utility functions"""
 
@@ -235,3 +380,14 @@ class TestCleanup:
         subscription_manager.delete_artifact_subscriptions = AsyncMock()
         await subscription_manager.cleanup()
         subscription_manager.delete_artifact_subscriptions.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_cleanup_network_error(self, subscription_manager):
+        """Test cleanup when network error occurs"""
+        subscription_manager.delete_artifact_subscriptions = AsyncMock(
+            side_effect=aiohttp.ClientError("Network error during cleanup")
+        )
+        await subscription_manager.cleanup()
+        subscription_manager.delete_artifact_subscriptions.assert_called_once()
+
+
