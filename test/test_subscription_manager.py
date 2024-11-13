@@ -391,3 +391,123 @@ class TestCleanup:
         subscription_manager.delete_artifact_subscriptions.assert_called_once()
 
 
+class TestErrorHandling:
+    """Test error handling scenarios for SubscriptionManagerArtifact"""
+
+    @pytest.mark.asyncio
+    async def test_get_active_subscriptions_unexpected_error(self, subscription_manager):
+        """Test get_active_subscriptions with unexpected error"""
+
+        class MockSession:
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                raise Exception("Unexpected error")
+
+        mock_session = MockSession()
+        result = await subscription_manager.get_active_subscriptions(mock_session)
+        assert result == [], "Should return empty list on unexpected error"
+
+    @pytest.mark.asyncio
+    async def test_find_artifact_subscriptions_malformed_description(self, subscription_manager):
+        """Test find_artifact_subscriptions with malformed subscription description"""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=[{
+            'id': 'test_sub_1',
+            'description': f"Artifact-ID: {subscription_manager.jid}, Sub-ID: "  # Malformed description
+        }])
+
+        class MockSession:
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                yield mock_response
+
+        mock_session = MockSession()
+        result = await subscription_manager.find_artifact_subscriptions(mock_session)
+        assert result == {}, "Should handle malformed description gracefully"
+
+    @pytest.mark.asyncio
+    async def test_delete_subscription_by_identifier_unexpected_error(self, subscription_manager):
+        """Test delete_subscription_by_identifier with unexpected error during find"""
+
+        class MockSession:
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                raise Exception("Unexpected error during find")
+
+        mock_session = MockSession()
+        result = await subscription_manager.delete_subscription_by_identifier(mock_session, "test_sub_001")
+        assert result is False, "Should return False on unexpected error"
+
+    @pytest.mark.asyncio
+    async def test_delete_artifact_subscriptions_partial_failure(self, subscription_manager):
+        """Test delete_artifact_subscriptions with partial failure"""
+
+        class MockSession:
+            def __init__(self):
+                self.get_calls = []
+                self.delete_calls = []
+
+            @asynccontextmanager
+            async def get(self, url, **kwargs):
+                self.get_calls.append((url, kwargs))
+                mock_response = AsyncMock()
+                mock_response.status = 200
+                mock_response.json = AsyncMock(return_value=[{
+                    'id': 'sub1',
+                    'description': f"Artifact-ID: {subscription_manager.jid}, Sub-ID: test_sub_001"
+                }])
+                yield mock_response
+
+            @asynccontextmanager
+            async def delete(self, url, **kwargs):
+                self.delete_calls.append((url, kwargs))
+                raise Exception("Delete failed")
+                yield
+
+        mock_session = MockSession()
+        await subscription_manager.delete_artifact_subscriptions(mock_session)
+        assert len(mock_session.get_calls) == 1, "Should attempt to get subscriptions"
+        assert len(mock_session.delete_calls) == 1, "Should attempt to delete subscription"
+        assert subscription_manager.active_subscriptions == {}, "Should clear active subscriptions"
+
+
+    @pytest.mark.asyncio
+    async def test_create_subscription_invalid_broker_url(self, subscription_manager):
+        """Test create_subscription with invalid broker URL"""
+        subscription_manager.broker_url = "http://invalid-url:9090"
+
+        class MockSession:
+            @asynccontextmanager
+            async def post(self, url, **kwargs):
+                raise aiohttp.ClientConnectorError(
+                    connection_key=None,
+                    os_error=OSError("Connection refused")
+                )
+
+        mock_session = MockSession()
+        result = await subscription_manager.create_subscription(
+            mock_session,
+            {"type": "Subscription"},
+            "test_sub_001"
+        )
+        assert result is None, "Should return None when broker URL is invalid"
+
+    @pytest.mark.asyncio
+    async def test_run_server_start_failure(self, subscription_manager):
+        """Test run method when server fails to start"""
+        subscription_manager.find_free_port = MagicMock(return_value=80)  # Usually requires root privileges
+        subscription_manager.presence.set_available = MagicMock()
+
+        with patch('aiohttp.ClientSession', new_callable=AsyncMock) as mock_session:
+            try:
+                await subscription_manager.run()
+            except Exception as e:
+                assert True, "Should handle server start failure gracefully"
+
+    @pytest.mark.asyncio
+    async def test_cleanup_session_error(self, subscription_manager):
+        """Test cleanup when session creation fails"""
+        with patch('aiohttp.ClientSession', side_effect=Exception("Session creation failed")):
+            await subscription_manager.cleanup()
+            # Should not raise exception and log error

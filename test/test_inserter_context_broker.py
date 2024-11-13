@@ -1,7 +1,11 @@
+import aiohttp
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from aiohttp import ClientSession, ClientError, ClientConnectionError
+from yarl import URL
+
+
 from spade_fiware_artifacts.context_broker_inserter import InserterArtifact
 from aioresponses import aioresponses
 
@@ -243,3 +247,152 @@ class TestRunMethod:
         inserter.presence.set_available.assert_called_once()
 
 
+class TestErrorHandling:
+    """Tests focusing on error handling scenarios"""
+
+    @pytest.mark.asyncio
+    async def test_artifact_callback_invalid_json(self, inserter):
+        """Test handling of invalid JSON in artifact_callback"""
+        invalid_payload = "{'invalid': json"
+        inserter.artifact_callback("test_artifact", invalid_payload)
+        await asyncio.sleep(0)  # Allow async queue operations to complete
+        assert inserter.payload_queue.empty()  # Invalid JSON should not be queued
+
+    @pytest.mark.asyncio
+    async def test_build_entity_json_missing_context(self, inserter):
+        """Test build_entity_json when context is missing"""
+        inserter.json_template = {"field": "value"}  # Template without @context
+        payload = {"type": "TestEntity", "id": "test1"}
+        result = inserter.build_entity_json(payload)
+        assert "@context" not in result
+
+    @pytest.mark.asyncio
+    async def test_create_new_entity_failure(self, inserter):
+        with aioresponses() as mocked:
+            # Try adding payload format and headers
+            mocked.post(
+                inserter.api_url,
+                status=400,
+                payload={"error": "Invalid entity data"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            entity_data = {
+                "id": "urn:ngsi-ld:TestEntity:test1",
+                "type": "TestEntity",
+                "@context": inserter.json_template["@context"]
+            }
+
+            await inserter.create_new_entity(entity_data)
+
+            # Alternative way to check requests
+            request_list = mocked.requests[('POST', URL(inserter.api_url))]
+            assert len(request_list) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_patch_failure(self, inserter):
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "temperature"
+            attribute_data = {"value": 25.0}
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+
+            # Try adding more specific mock
+            mocked.patch(
+                patch_url,
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_entity_attribute(
+                entity_id, attribute, attribute_data, context)
+
+            # Alternative way to check requests
+            request_list = mocked.requests[('PATCH', URL(patch_url))]
+            assert len(request_list) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_post_failure(self, inserter):
+        """Test update_entity_attribute with POST failure after PATCH"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "temperature"
+            attribute_data = {"value": 25.0}
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+            post_url = f"{inserter.api_url}/{entity_id}/attrs"
+
+            # Mock PATCH indicating attribute doesn't exist
+            mocked.patch(
+                URL(patch_url),
+                status=207
+            )
+
+            # Mock failed POST
+            mocked.post(
+                URL(post_url),
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_entity_attribute(
+                entity_id, attribute, attribute_data, context
+            )
+
+            # Verify both requests were made
+            assert len(mocked.requests[("PATCH", URL(patch_url))]) == 1
+            assert len(mocked.requests[("POST", URL(post_url))]) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_all_attributes_failure(self, inserter):
+        """Test update_all_attributes with mixed success/failure responses"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            entity_data = {
+                "temperature": {"value": 25.0},
+                "humidity": {"value": 60},
+                "@context": inserter.json_template["@context"]
+            }
+
+            # Mock successful temperature update
+            temp_url = f"{inserter.api_url}/{entity_id}/attrs/temperature"
+            mocked.patch(
+                URL(temp_url),
+                status=204
+            )
+
+            # Mock failed humidity update
+            humid_url = f"{inserter.api_url}/{entity_id}/attrs/humidity"
+            mocked.patch(
+                URL(humid_url),
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_all_attributes(
+                entity_id, entity_data, entity_data["@context"]
+            )
+
+            # Verify both attributes were attempted
+            assert len(mocked.requests[("PATCH", URL(temp_url))]) == 1
+            assert len(mocked.requests[("PATCH", URL(humid_url))]) == 1
+
+    @pytest.mark.asyncio
+    async def test_entity_exists_network_error(self, inserter):
+        """Test entity_exists with network connection error"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            url = f"{inserter.api_url}/{entity_id}"
+
+            # Mock network error
+            mocked.get(url, exception=aiohttp.ClientConnectionError(
+                "Connection refused"))
+
+            exists = await inserter.entity_exists(entity_id)
+            assert exists is False  # Should return False on connection error
