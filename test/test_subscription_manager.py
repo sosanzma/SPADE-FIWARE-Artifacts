@@ -595,56 +595,46 @@ class TestRunMethod:
     @pytest.mark.asyncio
     async def test_run_basic_functionality(self, subscription_manager):
         """Test basic run functionality with default configuration"""
-        # Mock methods that are not essential for this test
         subscription_manager.presence.set_available = MagicMock()
         subscription_manager.get_local_ip = MagicMock(return_value="127.0.0.1")
         subscription_manager.find_free_port = MagicMock(return_value=8080)
         subscription_manager.delete_artifact_subscriptions = AsyncMock()
         subscription_manager.create_subscription = AsyncMock(return_value="test_sub_id")
 
-        # Mock the infinite loop
         original_sleep = asyncio.sleep
         sleep_called = False
 
         async def mock_sleep(duration):
             nonlocal sleep_called
             sleep_called = True
-            raise asyncio.CancelledError()  # Break the infinite loop
+            raise asyncio.CancelledError()
 
         asyncio.sleep = AsyncMock(side_effect=mock_sleep)
 
         try:
-            # Mock the web application setup
             with patch('aiohttp.web.Application') as mock_app, \
                     patch('aiohttp.web.AppRunner') as mock_runner, \
                     patch('aiohttp.web.TCPSite') as mock_site, \
                     patch('aiohttp.ClientSession') as mock_session:
 
-                # Configure mock app
                 mock_app_instance = mock_app.return_value
                 mock_app_instance.router.add_post = MagicMock()
 
-                # Configure mock runner
                 mock_runner_instance = mock_runner.return_value
                 mock_runner_instance.setup = AsyncMock()
 
-                # Configure mock site
                 mock_site_instance = mock_site.return_value
                 mock_site_instance.start = AsyncMock()
 
-                # Run the method (it will be interrupted by the CancelledError)
                 with pytest.raises(asyncio.CancelledError):
                     await subscription_manager.run()
 
-                # Verify the sequence of operations
                 subscription_manager.presence.set_available.assert_called_once()
                 subscription_manager.get_local_ip.assert_called_once()
                 subscription_manager.find_free_port.assert_called_once()
 
-                # Verify no subscription deletion in this flow (as per default config)
                 subscription_manager.delete_artifact_subscriptions.assert_not_called()
 
-                # Verify web application setup
                 mock_app.assert_called_once()
                 mock_app_instance.router.add_post.assert_called_once_with("/notify",
                                                                           subscription_manager.handle_notification)
@@ -653,12 +643,10 @@ class TestRunMethod:
                 mock_site.assert_called_once()
                 mock_site_instance.start.assert_called_once()
 
-                # Verify subscription creation
                 assert subscription_manager.port == 8080
-                assert sleep_called  # Verify that we entered the infinite loop
+                assert sleep_called
 
         finally:
-            # Restore the original sleep function
             asyncio.sleep = original_sleep
     @pytest.mark.asyncio
     async def test_run_with_delete_all_subscriptions(self, subscription_manager):
@@ -673,7 +661,6 @@ class TestRunMethod:
                 patch('aiohttp.web.AppRunner'), \
                 patch('aiohttp.web.TCPSite'), \
                 patch('aiohttp.ClientSession'):
-            # Setup the asyncio event to stop the run loop
             async def stop_run():
                 await asyncio.sleep(0.1)
                 subscription_manager.running = False
