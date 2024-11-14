@@ -9,8 +9,9 @@ SPADE-FIWARE-Artifacts
         :target: https://github.com/sosanzma/spade-fiware-artifacts/actions
         :alt: Build Status
 
-.. image:: https://coveralls.io/repos/github/sosanzma/SPADE-FIWARE-Artifacts/badge.svg?branch=main
-    :target: https://coveralls.io/github/sosanzma/SPADE-FIWARE-Artifacts?branch=main
+.. image:: https://coveralls.io/repos/github/sosanzma/SPADE-FIWARE-Artifacts/badge.svg
+        :target: https://coveralls.io/github/sosanzma/SPADE-FIWARE-Artifacts
+
 
 Overview
 --------
