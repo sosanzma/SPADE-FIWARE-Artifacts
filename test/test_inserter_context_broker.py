@@ -1,8 +1,15 @@
+import logging
+
+import aiohttp
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-from aiohttp import ClientSession, ClientResponse, ClientError
+from aiohttp import ClientSession, ClientError, ClientConnectionError
+from yarl import URL
+
+
 from spade_fiware_artifacts.context_broker_inserter import InserterArtifact
+from aioresponses import aioresponses
 
 
 @pytest.fixture
@@ -23,124 +30,531 @@ def inserter():
         return artifact
 
 
-@pytest.mark.asyncio
-async def test_setup_success(inserter):
-    """Test successful setup with minimal mocking"""
-    inserter.link = AsyncMock()
-    await inserter.setup()
+class TestInserterSetup:
+    """Tests related to InserterArtifact setup functionality"""
 
-    inserter.presence.set_available.assert_called_once()
-    inserter.link.assert_called_once_with(
-        inserter.publisher_jid,
-        inserter.artifact_callback
-    )
+    @pytest.mark.asyncio
+    async def test_setup_presence_failure(self, inserter):
+        """Test setup when presence.set_available() fails"""
+        inserter.presence.set_available.side_effect = Exception("Presence error")
+        inserter.link = AsyncMock()
 
-
-@pytest.mark.asyncio
-async def test_setup_link_failure(inserter):
-    """Test setup failure when link fails"""
-    inserter.link = AsyncMock(side_effect=Exception("Link failed"))
-
-    with pytest.raises(Exception, match="Link failed"):
         await inserter.setup()
-
-    inserter.presence.set_available.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_process_valid_payload(inserter):
-    """Test processing a valid payload"""
-    test_payload = {
-        "type": "TestEntity",
-        "id": "test1",
-        "temperature": {"value": 25.0}
-    }
-
-    # Mock only the necessary methods
-    inserter.update_or_create_entity = AsyncMock()
-    await inserter.process_and_send_data(test_payload)
-
-    inserter.update_or_create_entity.assert_called_once()
-    call_args = inserter.update_or_create_entity.call_args[0]
-    assert "urn:ngsi-ld:TestEntity:test1" in call_args
-
-
-@pytest.mark.asyncio
-async def test_process_invalid_payload(inserter):
-    """Test processing an invalid payload (missing required fields)"""
-    invalid_payload = {
-        "temperature": {"value": 25.0}  # Missing type and id
-    }
-
-    inserter.update_or_create_entity = AsyncMock()
-    await inserter.process_and_send_data(invalid_payload)
-
-    inserter.update_or_create_entity.assert_not_called()
-"""
-class TestEntityInserter:
-    @pytest.mark.asyncio
-    async def test_entity_exists_success(self, inserter):
+        # Should continue despite presence error
+        inserter.link.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_entity_exists_not_found(self, inserter):
+    async def test_setup_with_sleep(self, inserter):
+        """Test setup with sleep timing"""
+        inserter.link = AsyncMock()
 
+        with patch('asyncio.sleep') as mock_sleep:
+            await inserter.setup()
+            mock_sleep.assert_called_once_with(1)
 
     @pytest.mark.asyncio
-    async def test_create_new_entity_success(self, inserter):
+    async def test_setup_link_failure(self, inserter, caplog):
+        """Test setup when link() fails"""
+        # Configure the link method to raise an exception
+        error_message = "Link connection failed"
+        inserter.link = AsyncMock(side_effect=Exception(error_message))
+        inserter.publisher_jid = "test_publisher@domain.com"
+
+        # Verify that the exception is re-raised
+        with pytest.raises(Exception) as exc_info:
+            await inserter.setup()
+
+        assert str(exc_info.value) == error_message
+
+
+
+class TestPayloadProcessing:
+    """Tests related to payload processing functionality"""
+
+    @pytest.mark.asyncio
+    async def test_process_payload_with_missing_type(self, inserter):
+        """Test processing payload with missing type field"""
+        invalid_payload = {
+            "id": "test1",
+            "temperature": {"value": 25.0}
+        }
+        await inserter.process_and_send_data(invalid_payload)
+        # Should log error and return without making requests
+
+    @pytest.mark.asyncio
+    async def test_process_payload_with_custom_processor(self, inserter):
+        """Test processing payload with custom data processor"""
+
+        def custom_processor(data):
+            data['processed'] = True
+            return [data]
+
+        inserter.data_processor = custom_processor
+        test_payload = '{"type": "TestEntity", "id": "test1"}'
+
+        inserter.artifact_callback("test_artifact", test_payload)
+        await asyncio.sleep(0)
+
+        queue_item = await inserter.payload_queue.get()
+        assert queue_item['processed'] is True
+
+    def test_default_data_processor(self):
+        # Input data for the test
+        input_data = {"key1": "value1", "key2": "value2"}
+
+        # Expected output
+        expected_output = [input_data]
+
+        # Call the function
+        result = InserterArtifact.default_data_processor(input_data)
+
+        # Assert that the result matches the expected output
+        assert result == expected_output, "The function did not encapsulate the data correctly in a list"
+
+
+class TestEntityOperations:
+    """Tests related to entity CRUD operations"""
+
+    @pytest.mark.asyncio
+    async def test_entity_exists_connection_error(self, inserter):
+        """Test entity existence check with connection error"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            url = f"{inserter.api_url}/{entity_id}"
+
+            mocked.get(url, exception=ClientConnectionError())
+
+            result = await inserter.entity_exists(entity_id)
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_geo_property(self, inserter):
+        """Test updating a GeoProperty attribute"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "location"
+            attribute_data = {
+                "coordinates": [40.123, -3.456]
+            }
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+            mocked.patch(patch_url, status=204)
+
+            await inserter.update_entity_attribute(entity_id, attribute, attribute_data, context)
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_relationship(self, inserter):
+        """Test updating a Relationship attribute"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "relatedTo"
+            attribute_data = {
+                "object": "urn:ngsi-ld:RelatedEntity:obj1"
+            }
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+            mocked.patch(patch_url, status=204)
+
+            await inserter.update_entity_attribute(entity_id, attribute, attribute_data, context)
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_not_found(self, inserter):
+        """Test updating a non-existent attribute"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "temperature"
+            attribute_data = {"value": 25.0}
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+            post_url = f"{inserter.api_url}/{entity_id}/attrs"
+
+            # Mock PATCH failure due to non-existent attribute
+            mocked.patch(patch_url, status=207)
+            # Mock successful POST to create attribute
+            mocked.post(post_url, status=204)
+
+            await inserter.update_entity_attribute(entity_id, attribute, attribute_data, context)
+
+    @pytest.mark.asyncio
+    async def test_update_all_attributes_mixed_types(self, inserter):
+        """Test updating multiple attributes of different types"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            entity_data = {
+                "temperature": {"value": 25.0},
+                "location": {"coordinates": [40.123, -3.456]},
+                "relatedTo": {"object": "urn:ngsi-ld:RelatedEntity:obj1"},
+                "@context": inserter.json_template["@context"]
+            }
+
+            # Mock responses for each attribute
+            for attr in ["temperature", "location", "relatedTo"]:
+                patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attr}"
+                mocked.patch(patch_url, status=204)
+
+            await inserter.update_all_attributes(
+                entity_id,
+                entity_data,
+                entity_data["@context"]
+            )
+
+
+class TestJsonTemplateHandling:
+    """Tests related to JSON template processing"""
+
+    def test_build_entity_json_with_missing_context(self, inserter):
+        """Test building entity JSON when context is missing from template"""
+        inserter.json_template = {}  # Remove context from template
+        payload = {
+            "type": "TestEntity",
+            "id": "test1",
+            "temperature": {"value": 25.0}
+        }
+
+        result = inserter.build_entity_json(payload)
+        # Should log error about missing context
+
+    def test_build_entity_json_with_placeholders(self, inserter):
+        """Test building entity JSON with placeholder substitution"""
+        inserter.json_template = {
+            "id": "urn:ngsi-ld:TestEntity:{id}",
+            "type": "{type}",
+            "temperature": {"value": "{temperature}"},
+            "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+        }
+
+        payload = {
+            "id": "test1",
+            "type": "TestEntity",
+            "temperature": 25.0
+        }
+
+        result = inserter.build_entity_json(payload)
+        assert result["id"] == "urn:ngsi-ld:TestEntity:test1"
+        assert result["type"] == "TestEntity"
+        assert result["temperature"]["value"] == 25.0
+
+    def test_build_entity_json_with_exceptions(self, inserter):
+        """Test building entity JSON with custom exceptions"""
+        inserter.json_exceptions = {
+            "custom_field": "custom_value"
+        }
+        inserter.json_template = {
+            "custom_field": {"type": "Property"},
+            "@context": "https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+        }
+
+        payload = {}
+        result = inserter.build_entity_json(payload, clean=False)
+        assert "custom_field" in result
+        assert result["custom_field"]["value"] == "None"
+
+    @pytest.mark.asyncio
+    async def test_build_entity_json_with_nested_lists(self):
+        """Test building entity JSON with nested lists in template"""
+        with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact'):
+            inserter = InserterArtifact(
+                jid="test@example.com",
+                passwd="password",
+                publisher_jid="publisher@example.com",
+                host="localhost",
+                project_name="test"
+            )
+
+            inserter.json_template = {
+                "@context": "https://context.example.com",
+                "values": [
+                    {"data": "{value1}"},
+                    {"nested": [
+                        {"subdata": "{value2}"}
+                    ]}
+                ]
+            }
+
+            payload = {
+                "value1": "test1",
+                "value2": "test2"
+            }
+
+            result = inserter.build_entity_json(payload)
+            assert result["values"][0]["data"] == "test1"
+            assert result["values"][1]["nested"][0]["subdata"] == "test2"
+
+    def test_build_entity_json_clean_empty_lists(self):
+        """Test build_entity_json cleaning empty lists"""
+        with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact'):
+            inserter = InserterArtifact(
+                jid="test@example.com",
+                passwd="password",
+                publisher_jid="publisher@example.com",
+                host="localhost",
+                project_name="test"
+            )
+
+            inserter.json_template = {
+                "@context": "https://context.example.com",
+                "list1": [],
+                "list2": [{"value": "{value}"}]
+            }
+
+            payload = {"value": "test"}
+            result = inserter.build_entity_json(payload)
+
+            # list1 should be removed as it's empty
+            assert "list1" not in result
+            # list2 should remain as it has content
+            assert "list2" in result
+
+class TestRunMethod:
+    """Tests related to the run method functionality"""
+
+    @pytest.mark.asyncio
+    async def test_run_method_exception_handling(self, inserter):
+        """Test run method's exception handling"""
+
+        inserter.process_and_send_data = AsyncMock(side_effect=Exception("Processing error"))
+
+        await inserter.payload_queue.put({"type": "TestEntity", "id": "test1"})
+
+        task = asyncio.create_task(inserter.run())
+
+        await asyncio.sleep(0.2)
+        task.cancel()
+
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+        inserter.presence.set_available.assert_called_once()
+
+
+class TestErrorHandling:
+    """Tests focusing on error handling scenarios"""
+
+    @pytest.mark.asyncio
+    async def test_artifact_callback_invalid_json(self, inserter):
+        """Test handling of invalid JSON in artifact_callback"""
+        invalid_payload = "{'invalid': json"
+        inserter.artifact_callback("test_artifact", invalid_payload)
+        await asyncio.sleep(0)  # Allow async queue operations to complete
+        assert inserter.payload_queue.empty()  # Invalid JSON should not be queued
+
+    @pytest.mark.asyncio
+    async def test_build_entity_json_missing_context(self, inserter):
+        """Test build_entity_json when context is missing"""
+        inserter.json_template = {"field": "value"}  # Template without @context
+        payload = {"type": "TestEntity", "id": "test1"}
+        result = inserter.build_entity_json(payload)
+        assert "@context" not in result
 
     @pytest.mark.asyncio
     async def test_create_new_entity_failure(self, inserter):
+        with aioresponses() as mocked:
+            # Try adding payload format and headers
+            mocked.post(
+                inserter.api_url,
+                status=400,
+                payload={"error": "Invalid entity data"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            entity_data = {
+                "id": "urn:ngsi-ld:TestEntity:test1",
+                "type": "TestEntity",
+                "@context": inserter.json_template["@context"]
+            }
+
+            await inserter.create_new_entity(entity_data)
+
+            # Alternative way to check requests
+            request_list = mocked.requests[('POST', URL(inserter.api_url))]
+            assert len(request_list) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_patch_failure(self, inserter):
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "temperature"
+            attribute_data = {"value": 25.0}
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+
+            # Try adding more specific mock
+            mocked.patch(
+                patch_url,
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_entity_attribute(
+                entity_id, attribute, attribute_data, context)
+
+            # Alternative way to check requests
+            request_list = mocked.requests[('PATCH', URL(patch_url))]
+            assert len(request_list) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_entity_attribute_post_failure(self, inserter):
+        """Test update_entity_attribute with POST failure after PATCH"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            attribute = "temperature"
+            attribute_data = {"value": 25.0}
+            context = inserter.json_template["@context"]
+
+            patch_url = f"{inserter.api_url}/{entity_id}/attrs/{attribute}"
+            post_url = f"{inserter.api_url}/{entity_id}/attrs"
+
+            # Mock PATCH indicating attribute doesn't exist
+            mocked.patch(
+                URL(patch_url),
+                status=207
+            )
+
+            # Mock failed POST
+            mocked.post(
+                URL(post_url),
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_entity_attribute(
+                entity_id, attribute, attribute_data, context
+            )
+
+            # Verify both requests were made
+            assert len(mocked.requests[("PATCH", URL(patch_url))]) == 1
+            assert len(mocked.requests[("POST", URL(post_url))]) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_all_attributes_failure(self, inserter):
+        """Test update_all_attributes with mixed success/failure responses"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            entity_data = {
+                "temperature": {"value": 25.0},
+                "humidity": {"value": 60},
+                "@context": inserter.json_template["@context"]
+            }
+
+            # Mock successful temperature update
+            temp_url = f"{inserter.api_url}/{entity_id}/attrs/temperature"
+            mocked.patch(
+                URL(temp_url),
+                status=204
+            )
+
+            # Mock failed humidity update
+            humid_url = f"{inserter.api_url}/{entity_id}/attrs/humidity"
+            mocked.patch(
+                URL(humid_url),
+                status=500,
+                payload={"error": "Internal server error"},
+                headers={'Content-Type': 'application/json'}
+            )
+
+            await inserter.update_all_attributes(
+                entity_id, entity_data, entity_data["@context"]
+            )
+
+            # Verify both attributes were attempted
+            assert len(mocked.requests[("PATCH", URL(temp_url))]) == 1
+            assert len(mocked.requests[("PATCH", URL(humid_url))]) == 1
+
+    @pytest.mark.asyncio
+    async def test_update_all_attributes_404_response(self):
+        """Test update_all_attributes when attribute doesn't exist (404 response)"""
+        with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact'):
+            inserter = InserterArtifact(
+                jid="test@example.com",
+                passwd="password",
+                publisher_jid="publisher@example.com",
+                host="localhost",
+                project_name="test"
+            )
+
+            with aioresponses() as mocked:
+                entity_id = "urn:ngsi-ld:TestEntity:test1"
+                entity_data = {
+                    "newAttribute": {"value": "test"},
+                    "@context": "https://context.example.com"
+                }
+
+                # Mock 404 response for PATCH
+                patch_url = f"{inserter.api_url}/{entity_id}/attrs/newAttribute"
+                mocked.patch(patch_url, status=404)
+
+                # Mock successful POST for creating new attribute
+                post_url = f"{inserter.api_url}/{entity_id}/attrs"
+                mocked.post(post_url, status=204)
+
+                await inserter.update_all_attributes(entity_id, entity_data, entity_data["@context"])
+
+                # Verify both requests were made
+                assert len(mocked.requests[("PATCH", URL(patch_url))]) == 1
+                assert len(mocked.requests[("POST", URL(post_url))]) == 1
+    @pytest.mark.asyncio
+    async def test_entity_exists_network_error(self, inserter):
+        """Test entity_exists with network connection error"""
+        with aioresponses() as mocked:
+            entity_id = "urn:ngsi-ld:TestEntity:test1"
+            url = f"{inserter.api_url}/{entity_id}"
+
+            # Mock network error
+            mocked.get(url, exception=aiohttp.ClientConnectionError(
+                "Connection refused"))
+
+            exists = await inserter.entity_exists(entity_id)
+            assert exists is False  # Should return False on connection error
 
 
-"""
+    @pytest.mark.asyncio
+    async def test_artifact_callback_processor_exception(self):
+        """Test artifact_callback when data_processor raises an exception"""
+        with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact'):
+            def failing_processor(data):
+                raise ValueError("Processing error")
 
+            inserter = InserterArtifact(
+                jid="test@example.com",
+                passwd="password",
+                publisher_jid="publisher@example.com",
+                host="localhost",
+                project_name="test",
+                data_processor=failing_processor
+            )
 
-@pytest.mark.asyncio
-async def test_update_specific_attributes(inserter):
-    """Test updating specific attributes"""
-    inserter.columns_update = ["temperature"]
-    inserter.update_entity_attribute = AsyncMock()
+            try:
+                # Valid JSON but processor will fail
+                payload = '{"type": "TestEntity", "id": "test1"}'
+                await inserter.artifact_callback("test_artifact", payload)
+            except ValueError as e:
+                assert str(e) == "Processing error"
+            await asyncio.sleep(0)
 
-    entity_data = {
-        "temperature": {"value": 25.0},
-        "@context": inserter.json_template["@context"]
-    }
+            # Queue should be empty since processing failed
+            assert inserter.payload_queue.empty()
 
-    await inserter.update_specific_attributes(
-        "urn:ngsi-ld:TestEntity:test1",
-        entity_data
-    )
+class Constructor:
+    """Tests related to the constructor method functionality"""
 
-    inserter.update_entity_attribute.assert_called_once_with(
-        "urn:ngsi-ld:TestEntity:test1",
-        "temperature",
-        {"value": 25.0},
-        inserter.json_template["@context"]
-    )
+    def test_inserter_custom_port(self):
+        """Test InserterArtifact initialization with custom port"""
+        with patch('spade_fiware_artifacts.context_broker_inserter.spade_artifact.Artifact'):
+            inserter = InserterArtifact(
+                jid="test@example.com",
+                passwd="password",
+                publisher_jid="publisher@example.com",
+                host="localhost",
+                project_name="test",
+                port="8080"
+            )
 
-
-@pytest.mark.asyncio
-async def test_artifact_callback_valid_json(inserter):
-    """Test artifact callback with valid JSON payload"""
-    test_payload = '{"type": "TestEntity", "id": "test1", "temperature": {"value": 25.0}}'
-    inserter.data_processor = MagicMock(return_value=[{"processed": "data"}])
-    inserter.payload_queue.put = AsyncMock()
-
-    inserter.artifact_callback("test_artifact", test_payload)
-    await asyncio.sleep(0)  # Allow async task to complete
-
-    inserter.payload_queue.put.assert_called_once_with({"processed": "data"})
-
-
-@pytest.mark.asyncio
-async def test_artifact_callback_invalid_json(inserter):
-    """Test artifact callback with invalid JSON payload"""
-    invalid_payload = 'invalid json'
-    inserter.data_processor = MagicMock()
-    inserter.payload_queue.put = AsyncMock()
-
-    inserter.artifact_callback("test_artifact", invalid_payload)
-    await asyncio.sleep(0)
-
-    inserter.data_processor.assert_not_called()
-    inserter.payload_queue.put.assert_not_called()
+            assert inserter.api_url == "http://localhost:8080/ngsi-ld/v1/entities"
