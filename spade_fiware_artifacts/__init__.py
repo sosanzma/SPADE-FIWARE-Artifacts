@@ -4,3 +4,7 @@ import spade_fiware_artifacts
 __author__ = """Manel Soler"""
 __email__ = "manelbng@gmail.com"
 __version__ = "0.1.0"
+
+
+from .context_broker_inserter import InserterArtifact
+from .context_broker_suscription_manager import SubscriptionManagerArtifact
