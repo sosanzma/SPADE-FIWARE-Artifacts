@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setup(
     name="spade-fiware-artifacts",
-    version="0.1",
+    version="0.1.1",
     author="Manel Soler Sanz",
     author_email="manelbng@gmail.com",
     description="A toolkit for multi-agent systems to interact with FIWARE's context management system",
