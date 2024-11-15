@@ -1,6 +1,10 @@
 SPADE-FIWARE-Artifacts
 =======================
 
+Documentation
+-------------
+Check out the  documentation at: https://spade-fiware-artifacts.readthedocs.io
+
 .. image:: https://readthedocs.org/projects/spade-fiware-artifacts/badge/?version=latest
     :target: https://spade-fiware-artifacts.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
@@ -11,6 +15,10 @@ SPADE-FIWARE-Artifacts
 
 .. image:: https://coveralls.io/repos/github/sosanzma/SPADE-FIWARE-Artifacts/badge.svg
     :target: https://coveralls.io/github/sosanzma/SPADE-FIWARE-Artifacts
+
+.. image:: https://img.shields.io/pypi/v/spade-fiware-artifacts
+    :target: https://pypi.org/project/spade-fiware-artifacts/
+    :alt: PyPI Version
 
 Overview
 --------
