@@ -3,7 +3,7 @@ import spade_fiware_artifacts
 
 __author__ = """Manel Soler"""
 __email__ = "manelbng@gmail.com"
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 
 from .context_broker_inserter import InserterArtifact

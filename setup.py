@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
 
 setup(
     name="spade-fiware-artifacts",
-    version="0.1.1",
+    version="0.1.2",
     author="Manel Soler Sanz",
     author_email="manelbng@gmail.com",
     description="A toolkit for multi-agent systems to interact with FIWARE's context management system",
@@ -16,7 +16,8 @@ setup(
     packages=find_packages(exclude=["test*"]),
     install_requires=[
 
-        "spade_artifact==0.2.1"
+        "spade_artifact==0.2.1",
+        "psycopg2-binary==2.9.9"
     ],
     include_package_data=True,
     classifiers=[
