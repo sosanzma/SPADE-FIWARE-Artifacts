@@ -1,6 +1,8 @@
 SPADE-FIWARE-Artifacts
 =======================
 
+> 🚧 **Work in Progress**: This repository is currently under active development. New features and improvements are being added regularly. Please note that some functionalities might not work as expected yet, but they will be refined over time.
+
 Documentation
 -------------
 Check out the  documentation at: https://spade-fiware-artifacts.readthedocs.io
