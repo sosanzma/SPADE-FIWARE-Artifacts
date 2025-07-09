@@ -21,6 +21,11 @@ Check out the  documentation at: https://spade-fiware-artifacts.readthedocs.io
     :target: https://pypi.org/project/spade-fiware-artifacts/
     :alt: PyPI Version
 
+.. image:: https://static.pepy.tech/badge/spade-fiware-artifacts
+    :target: https://pepy.tech/project/spade-fiware-artifacts
+    :alt: Downloads
+
+
 Overview
 --------
 
